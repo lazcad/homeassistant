@@ -1,4 +1,4 @@
-# homeassistant by Rave (Lazcad)
+# HomeAssistant Xiaomi Hub Component by Rave (Lazcad)
 
 Credits
 ---------------
@@ -23,8 +23,7 @@ This is an almost completed Home Assistant component for Xiaomi Hub. It allows y
 Power consumption for the plug and battery reporting is coming soon
 
 ![alt tag](http://lazcad.com/content/images/beer.png)
-Buy me a beer if you like what you're seeing!
-https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=R3P4SPQ7LHXMN
+[Buy me a beer](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=R3P4SPQ7LHXMN)  if you like what you're seeing!
 
 Installation
 ---------------
