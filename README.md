@@ -28,7 +28,7 @@ Power consumption for the plug and battery reporting is coming soon
 Installation
 ---------------
 
-1. First, copy all the files into the Home Assistant root location. Yes, it only works in the location below
+1. First, copy all the files into the Home Assistant root location. Not to the custom_components folder
 /srv/homeassistant/homeassistant_venv/lib/python3.4/site-packages/homeassistant/components
 
 2. Add the following line to the Configuration.yaml. You will need to get the Hub's key in order to issue command to the hub like turning on and off plug. Follow the steps here http://bbs.xiaomi.cn/t-13198850
