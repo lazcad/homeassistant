@@ -61,7 +61,7 @@ Installation
       event_data:
           button_name: 158d000xxxxxc2_switch
           click_type: single
-            action:
+    action:
       service: switch.toggle
       entity_id: switch.158d000xxxxx01_wall_switch_left
   ```
