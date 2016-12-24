@@ -25,7 +25,7 @@ class XiaomiSensor(XiaomiDevice, Entity):
 
     def __init__(self, resp, name, dataKey, xiaomiHub):
         """Initialize the XiaomiSensor."""
-        self._state = "None"
+        self.current_value = 0
         self._dataKey = dataKey
         XiaomiDevice.__init__(self, resp, name, xiaomiHub)
 
