@@ -42,7 +42,7 @@ class XiaomiSensor(XiaomiDevice, Entity):
             return '%'
 
     def parseStatus(self, data):
-        value = data[self._dataKey]
+        if self._dataKey in data and self.parseStatus(data) == True:
         self.current_value = int(value) / 100
         return True
 
