@@ -2,9 +2,9 @@
 
 Credits
 ---------------
-Credit to the following Github project
-https://github.com/fooxy/homeassistant-aqara
-https://github.com/louisZL/lumi-gateway-local-api
+Credits to the following Github project
+- https://github.com/fooxy/homeassistant-aqara
+- https://github.com/louisZL/lumi-gateway-local-api
 
 Description
 ---------------
@@ -49,7 +49,7 @@ Installation
           friendly_name: Door Sensor
   ```
         
-5. Add automation. For the Button and Switch, use the following event
+5. Add automation. For the Button and Switch, use the following event. Available click types are 'single', 'double' and 'hold'
   ```yaml
   automation:
   - alias: Turn on Dining Light when click
@@ -60,7 +60,7 @@ Installation
       event_type: click
       event_data:
           button_name: 158d000xxxxxc2_switch
-          click_type: click
+          click_type: single
             action:
       service: switch.toggle
       entity_id: switch.158d000xxxxx01_wall_switch_left
