@@ -4,7 +4,7 @@ Credit to the following Github project
 https://github.com/fooxy/homeassistant-aqara
 https://github.com/louisZL/lumi-gateway-local-api
 
-This is a complete (almost) Home Assistant component for Xiaomi Hub. It allows you to integrate the following devices into HA
+This is an almost completed Home Assistant component for Xiaomi Hub. It allows you to integrate the following devices into HA
 
 - Motion Sensor
 - Door and Window Sensor
@@ -14,6 +14,9 @@ This is a complete (almost) Home Assistant component for Xiaomi Hub. It allows y
 - Wall Switch (Double)
 - Wireless Switch (Single)
 - Wireless Switch (Double)
+- Cube (TODO, i don't have one yet)
+
+Power consumption for the plug and battery reporting is coming soon
 
 1) First, copy all the files into the Home Assistant root location. Yes, it only works in the location below
 /srv/homeassistant/homeassistant_venv/lib/python3.4/site-packages/homeassistant/components
