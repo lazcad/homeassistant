@@ -1,4 +1,4 @@
-# homeassistant
+# homeassistant by Rave (Lazcad)
 
 Credit to the following Github project
 https://github.com/fooxy/homeassistant-aqara
@@ -17,6 +17,14 @@ This is an almost completed Home Assistant component for Xiaomi Hub. It allows y
 - Cube (TODO, i don't have one yet)
 
 Power consumption for the plug and battery reporting is coming soon
+
+<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_top">
+<input type="hidden" name="cmd" value="_s-xclick">
+<input type="hidden" name="hosted_button_id" value="R3P4SPQ7LHXMN">
+<input type="image" src="http://lazcad.com/content/images/beer.png" border="0" name="submit" alt="PayPal - The safer, easier way to pay online!">
+<img alt="" border="0" src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" width="1" height="1">
+</form>
+
 
 1) First, copy all the files into the Home Assistant root location. Yes, it only works in the location below
 /srv/homeassistant/homeassistant_venv/lib/python3.4/site-packages/homeassistant/components
