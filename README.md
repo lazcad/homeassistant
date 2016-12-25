@@ -53,15 +53,27 @@ Installation
   ```yaml
   automation:
   - alias: Turn on Dining Light when click
-    initial_state: True
-    hide_entity: False
     trigger:
       platform: event
       event_type: click
       event_data:
-          button_name: 158d000xxxxxc2_switch
+          entity_id: binary_sensor.158d000xxxxxc2_switch
           click_type: single
     action:
       service: switch.toggle
       entity_id: switch.158d000xxxxx01_wall_switch_left
   ```
+6. To display custom data such as battery, add the following to configuration.yaml (I have not tested whether the battery code works)
+```yaml
+sensor:
+    platform: template
+    sensors:
+        battery_door:
+          friendly_name: 'Door Sensor Battery'
+          value_template: '{{ states.binary_sensor.door_window_sensor_158d000xxxxx0a.attributes.battery_level }}'
+          unit_of_measurement: '%'
+        battery_temp:
+          friendly_name: 'Temp Sensor Battery'
+          value_template: '{{ states.sensor.temperature_158d000xxxxx03.attributes.battery_level }}'
+          unit_of_measurement: '%'
+```
