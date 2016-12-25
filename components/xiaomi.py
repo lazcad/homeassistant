@@ -16,6 +16,8 @@ from homeassistant.helpers import discovery
 from homeassistant.helpers.entity import Entity
 from homeassistant.const import (EVENT_HOMEASSISTANT_START, EVENT_HOMEASSISTANT_STOP)
 
+REQUIREMENTS = ['pyCrypto==2.6.1']
+
 DOMAIN = 'xiaomi'
 CONF_KEY = 'key'
 
@@ -80,7 +82,7 @@ class XiaomiHub:
         self._threads = []
 
         try:
-            resp = self.sendSocket('{"cmd":"whois"}', "iam", self.MULTICAST_ADDRESS, self.GATEWAY_DISCOVERY_PORT)
+            resp = self._send_socket('{"cmd":"whois"}', "iam", self.MULTICAST_ADDRESS, self.GATEWAY_DISCOVERY_PORT)
             if resp["model"] == "gateway":
                 self.GATEWAY_IP = resp["ip"]
                 self.GATEWAY_PORT = int(resp["port"])
@@ -94,7 +96,7 @@ class XiaomiHub:
         if self.GATEWAY_IP is None:
             return None
 
-        self._mcastsocket = self._createMulticastSocket()
+        self._mcastsocket = self._create_mcast_socket()
         if self._listen() is True:
             _LOGGER.info("Listening")
 
@@ -104,13 +106,13 @@ class XiaomiHub:
     def _discover_devices(self):
 
         cmd = '{"cmd" : "get_id_list"}'
-        resp = self.sendCmd(cmd, "get_id_list_ack")
+        resp = self._send_cmd(cmd, "get_id_list_ack")
         self.GATEWAY_TOKEN = resp["token"]
         sids = json.loads(resp["data"])
         
         for sid in sids:
             cmd = '{"cmd":"read","sid":"' + sid + '"}'
-            resp = self.sendCmd(cmd, "read_ack")
+            resp = self._send_cmd(cmd, "read_ack")
             model = resp["model"]
             xiaomiDevice = {
                 "model":resp["model"], 
@@ -137,10 +139,10 @@ class XiaomiHub:
             elif model == 'ctrl_neutral2':
                 self.XIAOMI_DEVICES['switch'].append(resp)
 
-    def sendCmd(self, cmd, rtnCmd):
-        return self.sendSocket(cmd, rtnCmd, self.GATEWAY_IP, self.GATEWAY_PORT)
+    def _send_cmd(self, cmd, rtnCmd):
+        return self._send_socket(cmd, rtnCmd, self.GATEWAY_IP, self.GATEWAY_PORT)
 
-    def sendSocket(self, cmd, rtnCmd, ip, port):
+    def _send_socket(self, cmd, rtnCmd, ip, port):
         socket = self._socket
         try:
             socket.sendto(cmd.encode(), (ip, port))
@@ -157,12 +159,16 @@ class XiaomiHub:
             _LOGGER.error("Cannot connect to Gateway")
             socket.close()
 
-    def sendDataToHub(self, sid, datakey, datavalue):
-        key = self._getKey()
+    def write_to_hub(self, sid, datakey, datavalue):
+        key = self._get_key()
         cmd = '{ "cmd":"write","sid":"' + sid + '","data":"{"' + datakey + '":"' + datavalue + '","key":"' + key + '"}}'
-        self.sendCmd(cmd, "write_ack")     
+        return self._send_cmd(cmd, "write_ack")     
 
-    def _getKey(self):
+    def get_from_hub(self, sid):
+        cmd = '{ "cmd":"read","sid":"' + sid + '"}'
+        return self._send_cmd(cmd, "read_ack")     
+
+    def _get_key(self):
         key = self.GATEWAY_KEY
         IV = bytes(bytearray.fromhex("17996d093d28ddb3ba695a2e6f58562e"))
         mode = AES.MODE_CBC
@@ -171,7 +177,7 @@ class XiaomiHub:
         ciphertext = encryptor.encrypt(text)
         return ''.join('{:02x}'.format(x) for x in ciphertext)
 
-    def _createMulticastSocket(self):
+    def _create_mcast_socket(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((self.MULTICAST_ADDRESS, self.MULTICAST_PORT))
@@ -184,8 +190,8 @@ class XiaomiHub:
         self._queue = Queue()
         self._listening = True
 
-        t1 = Thread(target=self._listenToMessage, args=())
-        t2 = Thread(target=self._processReport, args=())
+        t1 = Thread(target=self._listen_to_msg, args=())
+        t2 = Thread(target=self._process_report, args=())
 
         self._threads.append(t1)
         self._threads.append(t2)
@@ -210,7 +216,7 @@ class XiaomiHub:
             self._mcastsocket.close()
             self._mcastsocket = None
 
-    def _listenToMessage(self):
+    def _listen_to_msg(self):
         while self._listening:
             if self._mcastsocket is not None:
                 data, addr = self._mcastsocket.recvfrom(self.SOCKET_BUFSIZE)
@@ -227,7 +233,7 @@ class XiaomiHub:
                     raise
                     _LOGGER.error("Cannot process Listen")
 
-    def _processReport(self):
+    def _process_report(self):
         while self._listening:
             packet = self._queue.get(True)
             if isinstance(packet, dict):
@@ -235,9 +241,11 @@ class XiaomiHub:
                     sid = packet['sid']
                     model = packet['model']
                     data = json.loads(packet['data'])
+                    if 'battery' in data:
+                        _LOGGER.error('Battery data:{0}'.format(data))
 
                     for device in self.XIAOMI_HA_DEVICES[sid]:
-                        device.pushData(data)
+                        device.push_data(data)
 
                 except Exception as e:
                     _LOGGER.error("Cannot process Report: {0}".format(e))
@@ -250,11 +258,10 @@ class XiaomiDevice(Entity):
     def __init__(self, resp, name, xiaomiHub):
         """Initialize the xiaomi device."""
         self._sid = resp['sid']
-        self._name = '{}_{}'.format(self._sid, name)
-        self._uniqueId = self._name
+        self._name = '{}_{}'.format(name, self._sid)
 
         if len(resp['data']) > 2:
-            self.parseStatus(json.loads(resp['data']))
+            self.parse_data(json.loads(resp['data']))
 
         self.xiaomiHub = xiaomiHub
         xiaomiHub.XIAOMI_HA_DEVICES[self._sid].append(self)
@@ -265,15 +272,11 @@ class XiaomiDevice(Entity):
         return self._name
 
     @property
-    def unique_id(self):
-        return self._uniqueId
-
-    @property
     def should_poll(self):
         return False
 
-    def pushData(self, data):
+    def push_data(self, data):
         return True
 
-    def parseStatus(self, data):
+    def parse_data(self, data):
         return True
