@@ -6,6 +6,7 @@ import logging
 
 from homeassistant.components.binary_sensor import (BinarySensorDevice)
 from homeassistant.components.xiaomi import (XiaomiDevice, XIAOMI_HUB)
+from homeassistant.const import ATTR_BATTERY_LEVEL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class XiaomiGenericBinarySensor(XiaomiDevice, BinarySensorDevice):
         self._state = False
         self._dataKey = dataKey
         self._dataOpenValue = dataOpenValue
+        self._battery = -1
         XiaomiDevice.__init__(self, resp, name, xiaomiHub)
 
     @property
@@ -50,18 +52,28 @@ class XiaomiGenericBinarySensor(XiaomiDevice, BinarySensorDevice):
         """Return true if sensor is on."""
         return self._state
 
-    def parseStatus(self, data):
+    def parse_data(self, data):
         state = True if data[self._dataKey] == self._dataOpenValue else False
-        
         if self._state == state:
             return False
         else:
             self._state = state
             return True
 
-    def pushData(self, data):
-        if self.parseStatus(data) == True:
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes."""
+        return {
+            ATTR_BATTERY_LEVEL: self._battery,
+        }
+
+    def push_data(self, data):
+        """Push from Hub"""
+        if self._dataKey in data and self.parse_data(data) == True:
             self.schedule_update_ha_state()
+
+        if 'battery' in data:
+            self._battery = data['battery']
 
 class XiaomiButton(XiaomiDevice, BinarySensorDevice):
 
@@ -77,8 +89,8 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
         """Return true if sensor is on."""
         return self._is_down
 
-    def pushData(self, data):
-
+    def push_data(self, data):
+        """Push from Hub"""
         if self._dataKey in data:
             state = data[self._dataKey]
             if state == 'long_click_press':
@@ -96,6 +108,6 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
                 click_type = 'double'
 
             self._hass.bus.fire('click', {
-                'button_name': self.name,
+                'entity_id': self.entity_id,
                 'click_type': click_type
             })
