@@ -4,7 +4,7 @@ Support for Xiaomi sensors.
 """
 import logging
 
-from homeassistant.const import TEMP_CELSIUS
+from homeassistant.const import (ATTR_BATTERY_LEVEL, TEMP_CELSIUS)
 from homeassistant.helpers.entity import Entity
 from homeassistant.components.xiaomi import (XiaomiDevice, XIAOMI_HUB)
 
@@ -27,6 +27,7 @@ class XiaomiSensor(XiaomiDevice, Entity):
         """Initialize the XiaomiSensor."""
         self.current_value = 0
         self._dataKey = dataKey
+        self._battery = -1
         XiaomiDevice.__init__(self, resp, name, xiaomiHub)
 
     @property
@@ -41,11 +42,27 @@ class XiaomiSensor(XiaomiDevice, Entity):
         elif self._dataKey == 'humidity':
             return '%'
 
-    def parseStatus(self, data):
-        if self._dataKey in data and self.parseStatus(data) == True:
+    def parse_data(self, data):
+        value = data[self._dataKey]
         self.current_value = int(value) / 100
         return True
 
-    def pushData(self, data):
-        if self.parseStatus(data) == True:
+    def push_data(self, data):
+        """Push from Hub"""
+        if self._dataKey in data and self.parse_data(data) == True:
             self.schedule_update_ha_state()
+
+        if 'battery' in data:
+            self._battery = data['battery']
+
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes."""
+        return {
+            ATTR_BATTERY_LEVEL: self._battery,
+        }
+
+    def update(self):
+        data = self.xiaomiHub.get_from_hub(self._sid)
+        self.push_data(data)
+
