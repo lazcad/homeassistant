@@ -41,11 +41,11 @@ Installation
 4. Add friendly names to the Configuration.yaml like below
   ```yaml
     customize:
-      binary_sensor.158d000xxxxxc3_switch:
+      binary_sensor.switch_158d000xxxxxc3:
           friendly_name: Ktichen Switch
-      binary_sensor.158d000xxxxxc2_switch:
+      binary_sensor.switch_158d000xxxxxc2:
           friendly_name: Table Switch
-      binary_sensor.158d000xxxxx7a_door_window_sensor:
+      binary_sensor.door_window_sensor_158d000xxxxx7a:
           friendly_name: Door Sensor
   ```
         
@@ -61,7 +61,7 @@ Installation
           click_type: single
     action:
       service: switch.toggle
-      entity_id: switch.158d000xxxxx01_wall_switch_left
+      entity_id: switch.wall_switch_left_158d000xxxxx01
   ```
 6. To display custom data such as battery, add the following to configuration.yaml (I have not tested whether the battery code works)
 ```yaml
