@@ -47,13 +47,13 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
     def turn_on(self, **kwargs):    
         """Turn the switch on."""
         self._state = True
-        self.xiaomiHub.sendDataToHub(self._sid, self._dataKey, 'on')
+        self.xiaomiHub.write_to_hub(self._sid, self._dataKey, 'on')
         self.schedule_update_ha_state()
 
     def turn_off(self):
         """Turn the switch off."""
         self._state = False
-        self.xiaomiHub.sendDataToHub(self._sid, self._dataKey, 'off')
+        self.xiaomiHub.write_to_hub(self._sid, self._dataKey, 'off')
         self.schedule_update_ha_state()
 
     def toggle(self):
@@ -62,15 +62,21 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
         else:
             self.turn_off()
 
-    def parseStatus(self, data):
+    def parse_data(self, data):
         state = True if data[self._dataKey] == 'on' else False
-        
         if self._state == state:
             return False
         else:
             self._state = state
             return True
 
-    def pushData(self, data):
-        if self._dataKey in data and self.parseStatus(data) == True:
+    def push_data(self, data):
+        """Push from Hub"""
+        if self._dataKey in data and self.parse_data(data) == True:
             self.schedule_update_ha_state()
+
+    def update(self):
+        _LOGGER.info('Updating')
+        data = self.xiaomiHub.get_from_hub(self._sid)
+        self.push_data(data)
+        _LOGGER.info('Pushing {0}'.format(data))
