@@ -57,7 +57,7 @@ Installation
       platform: event
       event_type: click
       event_data:
-          entity_id: binary_sensor.158d000xxxxxc2_switch
+          entity_id: binary_sensor.switch_158d000xxxxxc2
           click_type: single
     action:
       service: switch.toggle
