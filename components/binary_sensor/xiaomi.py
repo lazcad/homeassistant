@@ -1,11 +1,12 @@
 """
 Support for Xiaomi binary sensors.
 
+Developed by Rave from Lazcad.com
 """
 import logging
 
+from homeassistant.helpers.entity import Entity
 from homeassistant.components.binary_sensor import (BinarySensorDevice)
-from homeassistant.components.xiaomi import (XiaomiDevice, XIAOMI_HUB)
 from homeassistant.const import ATTR_BATTERY_LEVEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -13,37 +14,65 @@ _LOGGER = logging.getLogger(__name__)
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
 
-    for resp in XIAOMI_HUB.XIAOMI_DEVICES['binary_sensor']:
-            model = resp['model']
+    XIAOMI_HUB = hass.data['XIAOMI_HUB']
+    for device in XIAOMI_HUB.XIAOMI_DEVICES['binary_sensor']:
+            model = device['model']
             if (model == 'motion'):
-                add_devices([XiaomiGenericBinarySensor(resp, 'Motion Sensor','status', 'motion', XIAOMI_HUB)])
+                add_devices([XiaomiBinarySensor(device, 'Motion Sensor','status', 'motion', 'motion', 'no_motion', XIAOMI_HUB)])
             elif (model == 'magnet'):
-                add_devices([XiaomiGenericBinarySensor(resp, 'Door Window Sensor', 'status', 'open', XIAOMI_HUB)])
+                add_devices([XiaomiBinarySensor(device, 'Door Window Sensor', 'status', 'open', 'no_close', 'close', XIAOMI_HUB)])
             elif (model == 'switch'):
-                add_devices([XiaomiButton(resp, 'Switch', 'status', hass, XIAOMI_HUB)])
+                add_devices([XiaomiButton(device, 'Switch', 'status', hass, XIAOMI_HUB)])
             elif (model == '86sw1'):
-                add_devices([XiaomiButton(resp, 'Wall Switch', 'channel_0', hass, XIAOMI_HUB)])
+                add_devices([XiaomiButton(device, 'Wall Switch', 'channel_0', hass, XIAOMI_HUB)])
             elif (model == '86sw2'):
-                add_devices([
-                    XiaomiButton(resp, 'Wall Switch (Left)', 'channel_0', hass, XIAOMI_HUB), 
-                    XiaomiButton(resp, 'Wall Switch (Right)', 'channel_1', hass, XIAOMI_HUB)])
+                add_devices([XiaomiButton(device, 'Wall Switch (Left)', 'channel_0', hass, XIAOMI_HUB), 
+                    XiaomiButton(device, 'Wall Switch (Right)', 'channel_1', hass, XIAOMI_HUB)])
 
-class XiaomiGenericBinarySensor(XiaomiDevice, BinarySensorDevice):
-    """Representation of a XiaomiMotionSensor."""
+class XiaomiDevice(Entity):
+    """Representation a base Xiaomi device."""
 
-    def __init__(self, resp, name, dataKey, dataOpenValue, xiaomiHub):
-        """Initialize the XiaomiMotionSensor."""
+    def __init__(self, device, name, xiaomi_hub):
+        """Initialize the xiaomi device."""
+        self._sid = device['sid']
+        self._name = '{}_{}'.format(name, self._sid)
+        self.parse_data(device['data'])
+        self.xiaomi_hub = xiaomi_hub
+        xiaomi_hub.XIAOMI_HA_DEVICES[self._sid].append(self)
+
+    @property
+    def name(self):
+        """Return the name of the device."""
+        return self._name
+
+    @property
+    def should_poll(self):
+        return False
+
+    def push_data(self, data):
+        return True
+
+    def parse_data(self, data):
+        return True
+
+class XiaomiBinarySensor(XiaomiDevice, BinarySensorDevice):
+    """Representation of a XiaomiBinarySensor."""
+
+    def __init__(self, device, name, data_key, data_open_value, data_maintain_value, data_close_value, xiaomi_hub):
+        """Initialize the XiaomiBinarySensor."""
         self._state = False
-        self._dataKey = dataKey
-        self._dataOpenValue = dataOpenValue
+        self._data_key = data_key
+        self._data_open_value = data_open_value
+        self._data_maintain_value = data_maintain_value
+        self._data_close_value = data_close_value
         self._battery = -1
-        XiaomiDevice.__init__(self, resp, name, xiaomiHub)
+        XiaomiDevice.__init__(self, device, name, xiaomi_hub)
 
     @property
     def sensor_class(self):
-        if self._dataKey == 'motion':
+        if self._data_key == 'motion':
             return 'motion'
-        elif self._dataKey == 'open':
+        elif self._data_key == 'open':
             return 'opening'
         return None
 
@@ -53,12 +82,23 @@ class XiaomiGenericBinarySensor(XiaomiDevice, BinarySensorDevice):
         return self._state
 
     def parse_data(self, data):
-        state = True if data[self._dataKey] == self._dataOpenValue else False
-        if self._state == state:
+        if not self._data_key in data:
             return False
-        else:
-            self._state = state
-            return True
+
+        key_value = data[self._data_key]
+        if key_value == self._data_open_value or key_value == self._data_maintain_value:
+            if self._state == True:
+                return False
+            else:
+                self._state = True
+                return True
+
+        if key_value == self._data_close_value:
+            if self._state == True:
+                self._state = False
+                return True
+            else:
+                return False     
 
     @property
     def device_state_attributes(self):
@@ -69,7 +109,8 @@ class XiaomiGenericBinarySensor(XiaomiDevice, BinarySensorDevice):
 
     def push_data(self, data):
         """Push from Hub"""
-        if self._dataKey in data and self.parse_data(data) == True:
+        _LOGGER.error('{0} {1}'.format(self.name, data))
+        if self.parse_data(data) == True:
             self.schedule_update_ha_state()
 
         if 'battery' in data:
@@ -77,12 +118,12 @@ class XiaomiGenericBinarySensor(XiaomiDevice, BinarySensorDevice):
 
 class XiaomiButton(XiaomiDevice, BinarySensorDevice):
 
-    def __init__(self, resp, name, dataKey, hass, xiaomiHub):
+    def __init__(self, device, name, data_key, hass, xiaomi_hub):
         """Initialize the XiaomiButton."""
         self._is_down = False
         self._hass = hass
-        self._dataKey = dataKey
-        XiaomiDevice.__init__(self, resp, name, xiaomiHub)
+        self._data_key = data_key
+        XiaomiDevice.__init__(self, device, name, xiaomi_hub)
 
     @property
     def is_on(self):
@@ -91,23 +132,25 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
 
     def push_data(self, data):
         """Push from Hub"""
-        if self._dataKey in data:
-            state = data[self._dataKey]
-            if state == 'long_click_press':
-                self._is_down = True
-                self.schedule_update_ha_state()
-                return
+        if not self._data_key in data:
+            return False
 
-            if state == 'long_click_release':
-                self._is_down = False
-                self.schedule_update_ha_state()
-                click_type = 'hold'
-            elif state == 'click':
-                click_type = 'single'
-            elif state == 'double_click':
-                click_type = 'double'
+        state = data[self._data_key]
+        if state == 'long_click_press':
+            self._is_down = True
+            self.schedule_update_ha_state()
+            return
 
-            self._hass.bus.fire('click', {
-                'entity_id': self.entity_id,
-                'click_type': click_type
-            })
+        if state == 'long_click_release':
+            self._is_down = False
+            self.schedule_update_ha_state()
+            click_type = 'hold'
+        elif state == 'click':
+            click_type = 'single'
+        elif state == 'double_click':
+            click_type = 'double'
+
+        self._hass.bus.fire('click', {
+            'entity_id': self.entity_id,
+            'click_type': click_type
+        })
