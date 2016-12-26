@@ -109,7 +109,6 @@ class XiaomiBinarySensor(XiaomiDevice, BinarySensorDevice):
 
     def push_data(self, data):
         """Push from Hub"""
-        _LOGGER.error('{0} {1}'.format(self.name, data))
         if self.parse_data(data) == True:
             self.schedule_update_ha_state()
 
