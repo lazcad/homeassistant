@@ -1,34 +1,61 @@
 """
 Support for Xiaomi sensors.
 
+Developed by Rave from Lazcad.com
 """
 import logging
 
-from homeassistant.const import (ATTR_BATTERY_LEVEL, TEMP_CELSIUS)
 from homeassistant.helpers.entity import Entity
-from homeassistant.components.xiaomi import (XiaomiDevice, XIAOMI_HUB)
+from homeassistant.const import (ATTR_BATTERY_LEVEL, TEMP_CELSIUS)
 
 _LOGGER = logging.getLogger(__name__)
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
 
-    for resp in XIAOMI_HUB.XIAOMI_DEVICES['sensor']:
-        model = resp['model']
+    XIAOMI_HUB = hass.data['XIAOMI_HUB']
+    for device in XIAOMI_HUB.XIAOMI_DEVICES['sensor']:
+        model = device['model']
         if (model == 'sensor_ht'):
             add_devices([
-                XiaomiSensor(resp, 'Temperature', 'temperature', XIAOMI_HUB), 
-                XiaomiSensor(resp, 'Humidity', 'humidity', XIAOMI_HUB)])
+                XiaomiSensor(device, 'Temperature', 'temperature', XIAOMI_HUB), 
+                XiaomiSensor(device, 'Humidity', 'humidity', XIAOMI_HUB)])
+
+class XiaomiDevice(Entity):
+    """Representation a base Xiaomi device."""
+
+    def __init__(self, device, name, xiaomi_hub):
+        """Initialize the xiaomi device."""
+        self._sid = device['sid']
+        self._name = '{}_{}'.format(name, self._sid)
+        self.parse_data(device['data'])
+        self.xiaomi_hub = xiaomi_hub
+        xiaomi_hub.XIAOMI_HA_DEVICES[self._sid].append(self)
+
+    @property
+    def name(self):
+        """Return the name of the device."""
+        return self._name
+
+    @property
+    def should_poll(self):
+        return False
+
+    def push_data(self, data):
+        return True
+
+    def parse_data(self, data):
+        return True
 
 class XiaomiSensor(XiaomiDevice, Entity):
     """Representation of a XiaomiGenericSwitch."""
 
-    def __init__(self, resp, name, dataKey, xiaomiHub):
+    def __init__(self, device, name, data_key, xiaomi_hub):
         """Initialize the XiaomiSensor."""
         self.current_value = 0
-        self._dataKey = dataKey
+        self._data_key = data_key
         self._battery = -1
-        XiaomiDevice.__init__(self, resp, name, xiaomiHub)
+        XiaomiDevice.__init__(self, device, name, xiaomi_hub)
 
     @property
     def state(self):
@@ -37,19 +64,22 @@ class XiaomiSensor(XiaomiDevice, Entity):
 
     @property
     def unit_of_measurement(self):
-        if self._dataKey == 'temperature':
+        if self._data_key == 'temperature':
             return TEMP_CELSIUS 
-        elif self._dataKey == 'humidity':
+        elif self._data_key == 'humidity':
             return '%'
 
     def parse_data(self, data):
-        value = data[self._dataKey]
+        if not self._data_key in data:
+            return False
+
+        value = data[self._data_key]
         self.current_value = int(value) / 100
         return True
 
     def push_data(self, data):
         """Push from Hub"""
-        if self._dataKey in data and self.parse_data(data) == True:
+        if self.parse_data(data) == True:
             self.schedule_update_ha_state()
 
         if 'battery' in data:
@@ -63,6 +93,6 @@ class XiaomiSensor(XiaomiDevice, Entity):
         }
 
     def update(self):
-        data = self.xiaomiHub.get_from_hub(self._sid)
+        data = self.xiaomi_hub.get_from_hub(self._sid)
         self.push_data(data)
 
