@@ -1,6 +1,7 @@
 """
 Support for Xiaomi hubs.
 
+Developed by Rave from Lazcad.com
 """
 import socket
 import json
@@ -8,15 +9,14 @@ import logging
 import struct
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
-from Crypto.Cipher import AES
 from threading import Thread
 from queue import Queue
 from collections import defaultdict
 from homeassistant.helpers import discovery
 from homeassistant.helpers.entity import Entity
-from homeassistant.const import (EVENT_HOMEASSISTANT_START, EVENT_HOMEASSISTANT_STOP)
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 
-REQUIREMENTS = ['pyCrypto==2.6.1']
+REQUIREMENTS = ['pyCrypto']
 
 DOMAIN = 'xiaomi'
 CONF_KEY = 'key'
@@ -28,30 +28,30 @@ CONFIG_SCHEMA = vol.Schema({
 }, extra=vol.ALLOW_EXTRA)
 
 XIAOMI_COMPONENTS = ['binary_sensor', 'sensor', 'switch']
-XIAOMI_HUB = None
 
 # Shortcut for the logger
 _LOGGER = logging.getLogger(__name__)
 
 def setup(hass, config):
     """Set up the Xiaomi component."""
-
+    
     key = config[DOMAIN][CONF_KEY]
 
-    global XIAOMI_HUB
     XIAOMI_HUB = XiaomiHub(key)
-
+    
     if XIAOMI_HUB is None:
         _LOGGER.error("Could not connect to Xiaomi Hub")
         return False
 
     def stop_xiaomi(event):
         _LOGGER.info("Shutting down Xiaomi Hub.")
+        del hass.data['XIAOMI_HUB']
         XIAOMI_HUB.stop()
 
     hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, stop_xiaomi)
 
     # Load components for the devices in Xiaomi Hub
+    hass.data['XIAOMI_HUB'] = XIAOMI_HUB
     for component in XIAOMI_COMPONENTS:
         discovery.load_platform(hass, component, DOMAIN, {}, config)
 
@@ -64,6 +64,7 @@ class XiaomiHub:
     GATEWAY_PORT = None
     GATEWAY_SID = None
     GATEWAY_TOKEN = None
+
     XIAOMI_DEVICES = defaultdict(list)
     XIAOMI_HA_DEVICES = defaultdict(list)
 
@@ -82,13 +83,13 @@ class XiaomiHub:
         self._threads = []
 
         try:
-            resp = self._send_socket('{"cmd":"whois"}', "iam", self.MULTICAST_ADDRESS, self.GATEWAY_DISCOVERY_PORT)
-            if resp["model"] == "gateway":
-                self.GATEWAY_IP = resp["ip"]
-                self.GATEWAY_PORT = int(resp["port"])
-                self.GATEWAY_SID = resp["sid"]
+            data = self._send_socket('{"cmd":"whois"}', "iam", self.MULTICAST_ADDRESS, self.GATEWAY_DISCOVERY_PORT)
+            if data["model"] == "gateway":
+                self.GATEWAY_IP = data["ip"]
+                self.GATEWAY_PORT = int(data["port"])
+                self.GATEWAY_SID = data["sid"]
             else:
-                _LOGGER.error("Error with gateway response")
+                _LOGGER.error('Error with gateway response : {0}'.format(data))
         except Exception as e:
             raise
             _LOGGER.error("Cannot discover hub using whois: {0}".format(e))
@@ -102,7 +103,6 @@ class XiaomiHub:
 
         self._discover_devices()
 
-
     def _discover_devices(self):
 
         cmd = '{"cmd" : "get_id_list"}'
@@ -110,34 +110,32 @@ class XiaomiHub:
         self.GATEWAY_TOKEN = resp["token"]
         sids = json.loads(resp["data"])
         
+        sensors = ['sensor_ht']
+        binary_sensors = ['magnet', 'motion', 'switch', '86sw1', '86sw2']
+        switches = ['plug', 'ctrl_neutral1', 'ctrl_neutral2']
+
         for sid in sids:
             cmd = '{"cmd":"read","sid":"' + sid + '"}'
             resp = self._send_cmd(cmd, "read_ack")
             model = resp["model"]
-            xiaomiDevice = {
+            xiaomi_device = {
                 "model":resp["model"], 
                 "sid":resp["sid"], 
                 "short_id":resp["short_id"], 
                 "data":json.loads(resp["data"])}
 
-            if model == 'sensor_ht':
-                self.XIAOMI_DEVICES['sensor'].append(resp)
-            elif model == 'magnet':
-                self.XIAOMI_DEVICES['binary_sensor'].append(resp)
-            elif model == 'motion':
-                self.XIAOMI_DEVICES['binary_sensor'].append(resp)
-            elif model == 'switch':
-                self.XIAOMI_DEVICES['binary_sensor'].append(resp)
-            elif model == '86sw1':
-                self.XIAOMI_DEVICES['binary_sensor'].append(resp)
-            elif model == '86sw2':
-                self.XIAOMI_DEVICES['binary_sensor'].append(resp)
-            elif model == 'plug':
-                self.XIAOMI_DEVICES['switch'].append(resp)
-            elif model == 'ctrl_neutral1':
-                self.XIAOMI_DEVICES['switch'].append(resp)
-            elif model == 'ctrl_neutral2':
-                self.XIAOMI_DEVICES['switch'].append(resp)
+            device_type = None
+            if model in sensors:
+                device_type = 'sensor'
+            elif model in binary_sensors:
+                device_type = 'binary_sensor'
+            elif model in switches:
+                device_type = 'switch'
+
+            if device_type == None:
+                _LOGGER.error('Unsupported devices : {0}'.format(model))
+            else:
+                self.XIAOMI_DEVICES[device_type].append(xiaomi_device)
 
     def _send_cmd(self, cmd, rtnCmd):
         return self._send_socket(cmd, rtnCmd, self.GATEWAY_IP, self.GATEWAY_PORT)
@@ -159,9 +157,9 @@ class XiaomiHub:
             _LOGGER.error("Cannot connect to Gateway")
             socket.close()
 
-    def write_to_hub(self, sid, datakey, datavalue):
+    def write_to_hub(self, sid, data_key, datavalue):
         key = self._get_key()
-        cmd = '{ "cmd":"write","sid":"' + sid + '","data":"{"' + datakey + '":"' + datavalue + '","key":"' + key + '"}}'
+        cmd = '{ "cmd":"write","sid":"' + sid + '","data":"{"' + data_key + '":"' + datavalue + '","key":"' + key + '"}}'
         return self._send_cmd(cmd, "write_ack")     
 
     def get_from_hub(self, sid):
@@ -169,12 +167,10 @@ class XiaomiHub:
         return self._send_cmd(cmd, "read_ack")     
 
     def _get_key(self):
-        key = self.GATEWAY_KEY
-        IV = bytes(bytearray.fromhex("17996d093d28ddb3ba695a2e6f58562e"))
-        mode = AES.MODE_CBC
-        encryptor = AES.new(key, mode, IV=IV)
-        text = self.GATEWAY_TOKEN
-        ciphertext = encryptor.encrypt(text)
+        from Crypto.Cipher import AES
+        IV = bytes(bytearray.fromhex('17996d093d28ddb3ba695a2e6f58562e'))
+        encryptor = AES.new(self.GATEWAY_KEY, AES.MODE_CBC, IV=IV)
+        ciphertext = encryptor.encrypt(self.GATEWAY_TOKEN)
         return ''.join('{:02x}'.format(x) for x in ciphertext)
 
     def _create_mcast_socket(self):
@@ -192,13 +188,10 @@ class XiaomiHub:
 
         t1 = Thread(target=self._listen_to_msg, args=())
         t2 = Thread(target=self._process_report, args=())
-
         self._threads.append(t1)
         self._threads.append(t2)
-
         t1.daemon = True
         t2.da = True
-
         t1.start()
         t2.start()
 
@@ -228,10 +221,10 @@ class XiaomiHub:
                     elif cmd == 'report' or cmd == 'heartbeat':
                         self._queue.put(data)
                     else:
-                        _LOGGER.error("Unknown data")
+                        _LOGGER.error('Unknown multicast data : {0}'.format(data))
                 except Exception as e:
                     raise
-                    _LOGGER.error("Cannot process Listen")
+                    _LOGGER.error('Cannot process multicast message : {0}'.format(data))
 
     def _process_report(self):
         while self._listening:
@@ -241,9 +234,7 @@ class XiaomiHub:
                     sid = packet['sid']
                     model = packet['model']
                     data = json.loads(packet['data'])
-                    if 'battery' in data:
-                        _LOGGER.error('Battery data:{0}'.format(data))
-
+                    
                     for device in self.XIAOMI_HA_DEVICES[sid]:
                         device.push_data(data)
 
@@ -255,16 +246,14 @@ class XiaomiHub:
 class XiaomiDevice(Entity):
     """Representation a base Xiaomi device."""
 
-    def __init__(self, resp, name, xiaomiHub):
+    def __init__(self, device, name, xiaomi_hub):
         """Initialize the xiaomi device."""
-        self._sid = resp['sid']
+        self._sid = device['sid']
         self._name = '{}_{}'.format(name, self._sid)
+        self.parse_data(device['data'])
 
-        if len(resp['data']) > 2:
-            self.parse_data(json.loads(resp['data']))
-
-        self.xiaomiHub = xiaomiHub
-        xiaomiHub.XIAOMI_HA_DEVICES[self._sid].append(self)
+        self.xiaomi_hub = xiaomi_hub
+        xiaomi_hub.XIAOMI_HA_DEVICES[self._sid].append(self)
 
     @property
     def name(self):
