@@ -14,10 +14,10 @@ This is an almost completed Home Assistant component for Xiaomi Hub. It allows y
 - Door and Window Sensor
 - Button
 - Plug
-- Wall Switch (Single)
-- Wall Switch (Double)
-- Wireless Switch (Single)
-- Wireless Switch (Double)
+- Aqara Wall Switch (Single)
+- Aqara Wall Switch (Double)
+- Aqara Wireless Switch (Single)
+- Aqara Wireless Switch (Double)
 - Cube (TODO, i don't have one yet)
 
 Power consumption for the plug and battery reporting is coming soon
@@ -25,18 +25,27 @@ Power consumption for the plug and battery reporting is coming soon
 ![alt tag](http://lazcad.com/content/images/beer.png)
 [Buy me a beer](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=R3P4SPQ7LHXMN)  if you like what you're seeing!
 
-Installation
----------------
+Installation (Raspberry Pi)
+---------------------------
 
-1. First, copy all the files into the Home Assistant root location. Not to the custom_components folder
+1. First, copy all the files into the Home Assistant location. It can now be installed either to the custom_components folder 
+```
+/home/homeassistant/.homeassistant/custom_components
+```
+or the root folder (using virtual environment)
+```
 /srv/homeassistant/homeassistant_venv/lib/python3.4/site-packages/homeassistant/components
+```
 
 2. Add the following line to the Configuration.yaml. You will need to get the Hub's key in order to issue command to the hub like turning on and off plug. Follow the steps here http://bbs.xiaomi.cn/t-13198850
   ```yaml
   xiaomi :
     key: xxxxxxxxxxxxxxxx
   ```
-3. Start HA. if you get an error about pycrypto, most probably, it couldn't install itself. In this case, install pycrypto manually
+3. Start HA. Pycrypto should install automatically. If not, install pycrypto manually. if you are using virtual environment, remember to install from virtual environment like below
+```
+(homeassistant_venv) pi@raspberrypi:~ $ pip3 install pycrypto
+```
 
 4. Add friendly names to the Configuration.yaml like below
   ```yaml
