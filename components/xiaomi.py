@@ -20,10 +20,14 @@ REQUIREMENTS = ['pyCrypto']
 
 DOMAIN = 'xiaomi'
 CONF_KEY = 'key'
+AUTO_DISCOVERY = 'auto_discovery'
+GATEWAYS = 'gateways'
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
-        vol.Required(CONF_KEY): cv.string
+        vol.Required(CONF_KEY): cv.string,
+        vol.Optional(AUTO_DISCOVERY): cv.boolean,
+        vol.Optional(GATEWAYS): cv.ensure_list
     })
 }, extra=vol.ALLOW_EXTRA)
 
@@ -83,11 +87,13 @@ class XiaomiHub:
         self._threads = []
 
         try:
+            _LOGGER.info('Discovering Xiaomi Gateways')
             data = self._send_socket('{"cmd":"whois"}', "iam", self.MULTICAST_ADDRESS, self.GATEWAY_DISCOVERY_PORT)
             if data["model"] == "gateway":
                 self.GATEWAY_IP = data["ip"]
                 self.GATEWAY_PORT = int(data["port"])
                 self.GATEWAY_SID = data["sid"]
+                _LOGGER.info('Gateway found on IP {0}'.format(self.GATEWAY_IP))
             else:
                 _LOGGER.error('Error with gateway response : {0}'.format(data))
         except Exception as e:
@@ -95,12 +101,15 @@ class XiaomiHub:
             _LOGGER.error("Cannot discover hub using whois: {0}".format(e))
 
         if self.GATEWAY_IP is None:
+            _LOGGER.error('No Gateway found. Cannot continue')
             return None
-
+        
+        _LOGGER.info('Creating Multicast Socket')
         self._mcastsocket = self._create_mcast_socket()
         if self._listen() is True:
             _LOGGER.info("Listening")
 
+        _LOGGER.info('Discovering Xiaomi Devices')
         self._discover_devices()
 
     def _discover_devices(self):
@@ -108,8 +117,10 @@ class XiaomiHub:
         cmd = '{"cmd" : "get_id_list"}'
         resp = self._send_cmd(cmd, "get_id_list_ack")
         self.GATEWAY_TOKEN = resp["token"]
-        sids = json.loads(resp["data"])
-        
+        sids = json.loads(resp["data"])        
+
+        _LOGGER.info('Found {0} devices'.format(len(sids)))
+
         sensors = ['sensor_ht']
         binary_sensors = ['magnet', 'motion', 'switch', '86sw1', '86sw2']
         switches = ['plug', 'ctrl_neutral1', 'ctrl_neutral2']
@@ -143,7 +154,9 @@ class XiaomiHub:
     def _send_socket(self, cmd, rtnCmd, ip, port):
         socket = self._socket
         try:
+            socket.settimeout(10.0)
             socket.sendto(cmd.encode(), (ip, port))
+            socket.settimeout(10.0)
             data, addr = socket.recvfrom(1024)
             if len(data) is not None:
                 resp = json.loads(data.decode())
