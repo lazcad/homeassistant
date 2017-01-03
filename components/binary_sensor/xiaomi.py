@@ -23,6 +23,8 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
                 add_devices([XiaomiBinarySensor(device, 'Door Window Sensor', 'status', 'open', 'no_close', 'close', XIAOMI_HUB)])
             elif (model == 'switch'):
                 add_devices([XiaomiButton(device, 'Switch', 'status', hass, XIAOMI_HUB)])
+            elif (model == 'cube'):
+                add_devices([XiaomiCube(device, 'Cube', 'status', hass, XIAOMI_HUB)])
             elif (model == '86sw1'):
                 add_devices([XiaomiButton(device, 'Wall Switch', 'channel_0', hass, XIAOMI_HUB)])
             elif (model == '86sw2'):
@@ -152,4 +154,27 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
         self._hass.bus.fire('click', {
             'entity_id': self.entity_id,
             'click_type': click_type
+        })
+
+class XiaomiCube(XiaomiDevice, BinarySensorDevice):
+
+    def __init__(self, device, name, data_key, hass, xiaomi_hub):
+        """Initialize the XiaomiButton."""
+        self._hass = hass
+        self._data_key = data_key
+        XiaomiDevice.__init__(self, device, name, xiaomi_hub)
+
+    @property
+    def is_on(self):
+        """Return true if sensor is on."""
+        return False
+
+    def push_data(self, data):
+        """Push from Hub"""
+        if not self._data_key in data:
+            return False
+
+        self._hass.bus.fire('cube_action', {
+            'entity_id': self.entity_id,
+            'action_type': data[self._data_key]
         })
