@@ -73,7 +73,18 @@ or the root folder (using virtual environment)
       service: switch.toggle
       entity_id: switch.wall_switch_left_158d000xxxxx01
   ```
-6. To display custom data such as battery, add the following to configuration.yaml (I have not tested whether the battery code works)
+6. For Cube, use the following trigger. Available actions are flip90, flip180, move, tap_twice, shake_air, swing, alert, and free_fall
+
+```yaml
+    trigger:
+      platform: event
+      event_type: cube_action
+      event_data:
+          entity_id: binary_sensor.cube_158d000xxxxxc2
+          action_type: flip90
+```
+
+7. To display custom data such as battery, add the following to configuration.yaml (I have not tested whether the battery code works)
 ```yaml
 sensor:
     platform: template
