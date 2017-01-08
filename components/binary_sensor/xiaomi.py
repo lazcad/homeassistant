@@ -72,9 +72,9 @@ class XiaomiBinarySensor(XiaomiDevice, BinarySensorDevice):
 
     @property
     def sensor_class(self):
-        if self._data_key == 'motion':
+        if self._data_open_value == 'motion':
             return 'motion'
-        elif self._data_key == 'open':
+        elif self._data_open_value == 'open':
             return 'opening'
         return None
 
