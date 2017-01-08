@@ -134,7 +134,7 @@ class XiaomiHub:
                 model = 'cube'
 
             xiaomi_device = {
-                "model":resp["model"], 
+                "model":model, 
                 "sid":resp["sid"], 
                 "short_id":resp["short_id"], 
                 "data":json.loads(resp["data"])}
