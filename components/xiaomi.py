@@ -129,6 +129,10 @@ class XiaomiHub:
             cmd = '{"cmd":"read","sid":"' + sid + '"}'
             resp = self._send_cmd(cmd, "read_ack")
             model = resp["model"]
+
+            if model == '':
+                model = 'cube'
+
             xiaomi_device = {
                 "model":resp["model"], 
                 "sid":resp["sid"], 
