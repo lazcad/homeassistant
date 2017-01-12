@@ -81,6 +81,7 @@ class XiaomiHub:
 
     def __init__(self, key, config):
         self.GATEWAY_KEY = key
+        self.config = config
         self._listening = False
         self._queue = None
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -198,7 +199,12 @@ class XiaomiHub:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((self.MULTICAST_ADDRESS, self.MULTICAST_PORT))
-        mreq = struct.pack("4sl", socket.inet_aton(self.MULTICAST_ADDRESS), socket.INADDR_ANY)
+
+        if self.config["interface"] != 'any':
+            mreq = socket.inet_aton(self.MULTICAST_ADDRESS) + socket.inet_aton(self.config['interface'])
+        else:
+            mreq = struct.pack("4sl", socket.inet_aton(self.MULTICAST_ADDRESS), socket.INADDR_ANY)
+
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         return sock
 
