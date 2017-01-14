@@ -70,7 +70,6 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
         XiaomiDevice.__init__(self, device, name, xiaomi_hub)
 
     def parse_data(self, data):
-        _LOGGER.error('Parsing light data {0}'.format(data))
         if not self._data_key in data:
             return False
 

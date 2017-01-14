@@ -124,7 +124,7 @@ class XiaomiComponent:
                     if sid is None or sid == resp["sid"]:
                         gatewayKey = key
 
-                _LOGGER.info('Xiaomi Gateway found at IP {0}'.format(resp["ip"]))
+                _LOGGER.info('Xiaomi Gateway {0} found at IP {1}'.format(resp["sid"], resp["ip"]))
                 gateway = XiaomiGateway(resp["ip"], resp["port"], resp["sid"], gatewayKey, self._socket)
                 self.XIAOMI_GATEWAYS[resp["ip"]] = gateway
 
@@ -136,11 +136,12 @@ class XiaomiComponent:
     def _create_mcast_socket(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind((self.MULTICAST_ADDRESS, self.MULTICAST_PORT))
 
         if self._interface != 'any':
+            sock.bind((self._interface, self.MULTICAST_PORT))
             mreq = socket.inet_aton(self.MULTICAST_ADDRESS) + socket.inet_aton(self._interface)
         else:
+            sock.bind((self.MULTICAST_ADDRESS, self.MULTICAST_PORT))
             mreq = struct.pack("4sl", socket.inet_aton(self.MULTICAST_ADDRESS), socket.INADDR_ANY)
 
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
