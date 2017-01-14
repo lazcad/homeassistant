@@ -18,9 +18,14 @@ This is an almost completed Home Assistant component for Xiaomi Hub. It allows y
 - Aqara Wall Switch (Double)
 - Aqara Wireless Switch (Single)
 - Aqara Wireless Switch (Double)
-- Cube (TODO, i don't have one yet)
+- Cube
+- Gateway Light
 
-Power consumption for the plug and battery reporting is coming soon
+What's not available?
+- Gateway Sensor
+- Gateway Radio
+- Power Consumption
+- Battery
 
 ![alt tag](http://lazcad.com/content/images/beer.png)
 [Buy me a beer](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=R3P4SPQ7LHXMN)  if you like what you're seeing!
@@ -39,10 +44,26 @@ or the root folder (using virtual environment)
 
 2. Add the following line to the Configuration.yaml. You will need to get the Hub's key in order to issue command to the hub like turning on and off plug. Follow the steps here http://bbs.xiaomi.cn/t-13198850
 
+One Gateway
   ```yaml
-  xiaomi:
-    key: xxxxxxxxxxxxxxxx
+#you can leave sid empty if you only have one gateway
+xiaomi:
+  gateways:
+    - sid:
+      key: xxxxxxxxxxxxxxxx
   ```
+
+Multiple Gateway
+  ```yaml
+#12 characters sid can be obtained from the gateway's MAC address.
+xiaomi:
+  gateways:
+    - sid: xxxxxxxxxxxx
+      key: xxxxxxxxxxxxxxxx
+    - sid: xxxxxxxxxxxx
+      key: xxxxxxxxxxxxxxxx
+  ```
+
 3. Start HA. Pycrypto should install automatically. If not, install pycrypto manually. if you are using virtual environment, remember to install from virtual environment like below
 ```
 (homeassistant_venv) pi@raspberrypi:~ $ pip3 install pycrypto
@@ -73,7 +94,7 @@ or the root folder (using virtual environment)
       service: switch.toggle
       entity_id: switch.wall_switch_left_158d000xxxxx01
   ```
-6. For Cube, use the following trigger. Available actions are flip90, flip180, move, tap_twice, shake_air, swing, alert, and free_fall
+6. For Cube, use the following trigger. Available actions are flip90, flip180, move, tap_twice, shake_air, swing, alert, free_fall and rotate
 
 ```yaml
     trigger:
@@ -82,19 +103,4 @@ or the root folder (using virtual environment)
       event_data:
           entity_id: binary_sensor.cube_158d000xxxxxc2
           action_type: flip90
-```
-
-7. To display custom data such as battery, add the following to configuration.yaml (I have not tested whether the battery code works)
-```yaml
-sensor:
-    platform: template
-    sensors:
-        battery_door:
-          friendly_name: 'Door Sensor Battery'
-          value_template: '{{ states.binary_sensor.door_window_sensor_158d000xxxxx0a.attributes.battery_level }}'
-          unit_of_measurement: '%'
-        battery_temp:
-          friendly_name: 'Temp Sensor Battery'
-          value_template: '{{ states.sensor.temperature_158d000xxxxx03.attributes.battery_level }}'
-          unit_of_measurement: '%'
 ```

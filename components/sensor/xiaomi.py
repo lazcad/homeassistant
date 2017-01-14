@@ -13,13 +13,14 @@ _LOGGER = logging.getLogger(__name__)
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
 
-    XIAOMI_HUB = hass.data['XIAOMI_HUB']
-    for device in XIAOMI_HUB.XIAOMI_DEVICES['sensor']:
-        model = device['model']
-        if (model == 'sensor_ht'):
-            add_devices([
-                XiaomiSensor(device, 'Temperature', 'temperature', XIAOMI_HUB), 
-                XiaomiSensor(device, 'Humidity', 'humidity', XIAOMI_HUB)])
+    XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
+    for (ip, gateway) in XIAOMI_GATEWAYS.items():
+        for device in gateway.XIAOMI_DEVICES['sensor']:
+            model = device['model']
+            if (model == 'sensor_ht'):
+                add_devices([
+                    XiaomiSensor(device, 'Temperature', 'temperature', gateway), 
+                    XiaomiSensor(device, 'Humidity', 'humidity', gateway)])
 
 class XiaomiDevice(Entity):
     """Representation a base Xiaomi device."""

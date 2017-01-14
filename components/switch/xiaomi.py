@@ -12,18 +12,20 @@ _LOGGER = logging.getLogger(__name__)
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
-    
-    XIAOMI_HUB = hass.data['XIAOMI_HUB']
-    for device in XIAOMI_HUB.XIAOMI_DEVICES['switch']:
-        model = device['model']
-        if (model == 'plug'):
-            add_devices([XiaomiGenericSwitch(device, "Plug", 'status', XIAOMI_HUB)])
-        elif (model == 'ctrl_neutral1'):
-            add_devices([XiaomiGenericSwitch(device, 'Wall Switch', 'channel_0', XIAOMI_HUB)])
-        elif (model == 'ctrl_neutral2'):
-            add_devices([
-                XiaomiGenericSwitch(device, 'Wall Switch Left','channel_0', XIAOMI_HUB), 
-                XiaomiGenericSwitch(device, 'Wall Switch Right', 'channel_1', XIAOMI_HUB)])
+
+    XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
+
+    for ip, gateway in XIAOMI_GATEWAYS.items():
+        for device in gateway.XIAOMI_DEVICES['switch']:
+            model = device['model']
+            if (model == 'plug'):
+                add_devices([XiaomiGenericSwitch(device, "Plug", 'status', gateway)])
+            elif (model == 'ctrl_neutral1'):
+                add_devices([XiaomiGenericSwitch(device, 'Wall Switch', 'channel_0', gateway)])
+            elif (model == 'ctrl_neutral2'):
+                add_devices([
+                    XiaomiGenericSwitch(device, 'Wall Switch Left','channel_0', gateway), 
+                    XiaomiGenericSwitch(device, 'Wall Switch Right', 'channel_1', gateway)])
 
 class XiaomiDevice(Entity):
     """Representation a base Xiaomi device."""
@@ -74,15 +76,15 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
 
     def turn_on(self, **kwargs):    
         """Turn the switch on."""
-        self._state = True
-        self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'on')
-        self.schedule_update_ha_state()
+        if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'on'):
+            self._state = True
+            self.schedule_update_ha_state()
 
     def turn_off(self):
         """Turn the switch off."""
-        self._state = False
-        self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'off')
-        self.schedule_update_ha_state()
+        if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'off'):
+            self._state = False
+            self.schedule_update_ha_state()
 
     def toggle(self):
         if self._state == False:
