@@ -104,3 +104,14 @@ xiaomi:
           entity_id: binary_sensor.cube_158d000xxxxxc2
           action_type: flip90
 ```
+
+7. If you have issue with Socket binding or multicast, add the IP address of the network interface to the config
+```yaml
+xiaomi:
+  interface: xx.xx.xx.xx
+  gateways:
+    - sid: xxxxxxxxxxxx
+      key: xxxxxxxxxxxxxxxx
+    - sid: xxxxxxxxxxxx
+      key: xxxxxxxxxxxxxxxx
+  ```
