@@ -106,12 +106,13 @@ Installation (Raspberry Pi)
  ```
 
 7. If you have issue with Socket binding or multicast, add the IP address of the network interface to the config
+ 
  ```yaml
  xiaomi:
-   interface: xx.xx.xx.xx
    gateways:
      - sid: xxxxxxxxxxxx
        key: xxxxxxxxxxxxxxxx
      - sid: xxxxxxxxxxxx
        key: xxxxxxxxxxxxxxxx
+    interface: xx.xx.xx.xx
  ```
