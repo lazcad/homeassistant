@@ -22,12 +22,14 @@ DOMAIN = 'xiaomi'
 CONF_KEY = 'key'
 AUTO_DISCOVERY = 'auto_discovery'
 GATEWAYS = 'gateways'
+INTERFACE = 'interface'
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
         vol.Required(CONF_KEY): cv.string,
         vol.Optional(AUTO_DISCOVERY): cv.boolean,
-        vol.Optional(GATEWAYS): cv.ensure_list
+        vol.Optional(GATEWAYS): cv.ensure_list,
+        vol.Optional(INTERFACE, default='any'): cv.string
     })
 }, extra=vol.ALLOW_EXTRA)
 
@@ -41,7 +43,7 @@ def setup(hass, config):
     
     key = config[DOMAIN][CONF_KEY]
 
-    XIAOMI_HUB = XiaomiHub(key)
+    XIAOMI_HUB = XiaomiHub(key, config[DOMAIN])
     
     if XIAOMI_HUB is None:
         _LOGGER.error("Could not connect to Xiaomi Hub")
@@ -77,11 +79,14 @@ class XiaomiHub:
     GATEWAY_DISCOVERY_PORT = 4321
     SOCKET_BUFSIZE = 1024
 
-    def __init__(self, key):
+    def __init__(self, key, config):
         self.GATEWAY_KEY = key
+        self.config = config
         self._listening = False
         self._queue = None
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if config["interface"] != 'any':
+            self._socket.bind((config["interface"], 0))
         self._mcastsocket = None
         self._deviceCallbacks = defaultdict(list)
         self._threads = []
@@ -194,7 +199,12 @@ class XiaomiHub:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((self.MULTICAST_ADDRESS, self.MULTICAST_PORT))
-        mreq = struct.pack("4sl", socket.inet_aton(self.MULTICAST_ADDRESS), socket.INADDR_ANY)
+
+        if self.config["interface"] != 'any':
+            mreq = socket.inet_aton(self.MULTICAST_ADDRESS) + socket.inet_aton(self.config['interface'])
+        else:
+            mreq = struct.pack("4sl", socket.inet_aton(self.MULTICAST_ADDRESS), socket.INADDR_ANY)
+
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         return sock
 
