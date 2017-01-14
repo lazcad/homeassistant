@@ -87,6 +87,11 @@ class XiaomiComponent:
         self.hass = hass
         self._listening = False
         self._mcastsocket = None
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        if interface != 'any':
+            self._socket.bind((interface, 0))
+
         self._threads = []
         self._gateways_config = gateways_config
         self._interface = interface; 
@@ -120,7 +125,7 @@ class XiaomiComponent:
                         gatewayKey = key
 
                 _LOGGER.info('Xiaomi Gateway found at IP {0}'.format(resp["ip"]))
-                gateway = XiaomiGateway(resp["ip"], resp["port"], resp["sid"], gatewayKey, self._interface)
+                gateway = XiaomiGateway(resp["ip"], resp["port"], resp["sid"], gatewayKey, self._socket)
                 self.XIAOMI_GATEWAYS[resp["ip"]] = gateway
 
         except socket.timeout:
@@ -160,12 +165,18 @@ class XiaomiComponent:
         """Stop listening."""
         self._listening = False
 
-        for t in self._threads:
-            t.join()
+        if self._socket is not None:
+            _LOGGER.info('Closing socket')
+            self._socket.close()
+            self._socket = None
 
         if self._mcastsocket is not None:
+            _LOGGER.info('Closing multisocket')
             self._mcastsocket.close()
             self._mcastsocket = None
+
+        for t in self._threads:
+            t.join()
 
     def _listen_to_msg(self):
         while self._listening:
@@ -197,7 +208,7 @@ class XiaomiComponent:
 
 class XiaomiGateway:
 
-    def __init__(self, ip, port, sid, key, interface):
+    def __init__(self, ip, port, sid, key, socket):
 
         self.GATEWAY_IP = ip
         self.GATEWAY_PORT = int(port)
@@ -207,11 +218,7 @@ class XiaomiGateway:
         self.XIAOMI_DEVICES = defaultdict(list)
         self.XIAOMI_HA_DEVICES = defaultdict(list)
 
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        if interface != 'any':
-            self._socket.bind((interface, 0))
-
-        self._deviceCallbacks = defaultdict(list)
+        self._socket = socket
 
         _LOGGER.info('Discovering Xiaomi Devices')
         self._discover_devices()

@@ -4,7 +4,8 @@ Support for Xiaomi Gateway Light.
 Developed by Rave from Lazcad.com
 """
 import logging
-
+import struct
+import binascii
 from homeassistant.helpers.entity import Entity
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS, ATTR_COLOR_TEMP, ATTR_EFFECT,
@@ -19,7 +20,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
 
     XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
     for (ip, gateway) in XIAOMI_GATEWAYS.items():
-        _LOGGER.error(gateway.XIAOMI_DEVICES['light'])
         for device in gateway.XIAOMI_DEVICES['light']:
             model = device['model']
             if (model == 'gateway'):
@@ -59,7 +59,7 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
         self._data_key = 'rgb'
 
         self._state = False
-        self._rgb = None
+        self._rgb = (255,255,255)
         self._ct = None
         self._brightness = 180
         self._xy_color = (.5, .5)
@@ -70,8 +70,25 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
         XiaomiDevice.__init__(self, device, name, xiaomi_hub)
 
     def parse_data(self, data):
+        _LOGGER.error('Parsing light data {0}'.format(data))
         if not self._data_key in data:
             return False
+
+        if data['rgb'] == 0:
+            if self._state == False:
+                return False
+            else:
+                self._state = False
+                return True
+
+        rgbhex = bytes.fromhex("%x" % data['rgb'])
+        rgba = struct.unpack('BBBB',rgbhex)
+        brightness = rgba[0]
+        rgb = rgba[1:]
+
+        self._brightness = brightness
+        self._rgb = rgb
+        self._state = True
 
         return True
 
@@ -135,7 +152,11 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
         if ATTR_BRIGHTNESS in kwargs:
             self._brightness = kwargs[ATTR_BRIGHTNESS]
 
-        if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 4294967295):
+        rgba = (self._brightness,) + self._rgb
+        rgbhex = binascii.hexlify(struct.pack('BBBB',*rgba)).decode("ASCII")
+        rgbhex = int(rgbhex, 16)
+
+        if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, rgbhex):
             self._state = True
             self.schedule_update_ha_state()
 
