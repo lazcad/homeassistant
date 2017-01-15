@@ -80,12 +80,17 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
                 self._state = False
                 return True
 
-        rgbhex = bytes.fromhex("%x" % data['rgb'])
+        rgbhexstr = "%x" % data['rgb']
+        if len(rgbhexstr) == 7:
+            # fromhex can't deal with odd strings
+            rgbhexstr = '0' + rgbhexstr
+
+        rgbhex = bytes.fromhex(rgbhexstr)
         rgba = struct.unpack('BBBB',rgbhex)
         brightness = rgba[0]
         rgb = rgba[1:]
 
-        self._brightness = brightness
+        self._brightness = int(255 * brightness / 100)
         self._rgb = rgb
         self._state = True
 
@@ -149,7 +154,7 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
             self._rgb = kwargs[ATTR_RGB_COLOR]
 
         if ATTR_BRIGHTNESS in kwargs:
-            self._brightness = kwargs[ATTR_BRIGHTNESS]
+            self._brightness = int(100 * kwargs[ATTR_BRIGHTNESS] / 255)
 
         rgba = (self._brightness,) + self._rgb
         rgbhex = binascii.hexlify(struct.pack('BBBB',*rgba)).decode("ASCII")
