@@ -42,7 +42,7 @@ Installation (Raspberry Pi)
  /srv/homeassistant/homeassistant_venv/lib/python3.4/site-packages/homeassistant/components
  ```
 
-2. Add the following line to the Configuration.yaml. You will need to get the Hub's key in order to issue command to the hub like turning on and off plug. Follow the steps here http://bbs.xiaomi.cn/t-13198850
+2. Add the following line to the Configuration.yaml. Make sure you're on the latest firmware. You will need to get the Hub's key in order to issue command to the hub like turning on and off plug. Follow the steps here http://bbs.xiaomi.cn/t-13198850
 
  One Gateway
   ```yaml
