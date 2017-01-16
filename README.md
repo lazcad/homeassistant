@@ -105,7 +105,7 @@ Installation (Raspberry Pi)
           action_type: flip90
  ```
 
-7. If you have issue with Socket binding or multicast, add the IP address of the network interface to the config
+7. Important! Only use this if you have have issue with Socket binding or multicast. Using this when you have no problem with socket or mcast will introduce other issues. Add the IP address of the network interface to the config
  
  ```yaml
  xiaomi:
