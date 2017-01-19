@@ -22,7 +22,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             if (model == 'motion'):
                 add_devices([XiaomiMotionSensor(device, gateway, hass)])
             elif (model == 'magnet'):
-                add_devices([XiaomiDoorSensor(device, gateway)])
+                add_devices([XiaomiDoorSensor(device, gateway, hass)])
             elif (model == 'switch'):
                 add_devices([XiaomiButton(device, 'Switch', 'status', hass, gateway)])
             elif (model == 'cube'):
@@ -81,6 +81,10 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
     def parse_data(self, data):
         if 'status' in data:
             value = data['status']
+            self._hass.bus.fire('motion_action', {
+                'entity_id': self.entity_id,
+                'action_type': value
+            })
             if value == 'motion':
                 if self._state == True: 
                     return False
@@ -96,6 +100,10 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
                     return True
 
         if 'no_motion' in data:
+            self._hass.bus.fire('motion_action', {
+                'entity_id': self.entity_id,
+                'action_type': 'no_motion'
+            })
             if self._state == True:
                 self._state = False
                 return True
@@ -131,10 +139,11 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
 class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
     """Representation of a XiaomiDoorSensor."""
 
-    def __init__(self, device, xiaomi_hub):
+    def __init__(self, device, xiaomi_hub, hass):
         """Initialize the XiaomiDoorSensor."""
         self._state = False
         self._battery = -1
+        self._hass = hass
         XiaomiDevice.__init__(self, device, 'Door Window Sensor', xiaomi_hub)
 
     @property
@@ -151,6 +160,10 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
             return False
 
         value = data['status']
+        self._hass.bus.fire('door_window_action', {
+            'entity_id': self.entity_id,
+            'action_type': value
+        })
         if value == 'open' or value == 'no_close':
             if self._state == True:
                 return False
