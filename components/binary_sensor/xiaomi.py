@@ -4,6 +4,7 @@ Support for Xiaomi binary sensors.
 Developed by Rave from Lazcad.com
 """
 import logging
+import asyncio
 
 from homeassistant.helpers.entity import Entity
 from homeassistant.components.binary_sensor import (BinarySensorDevice)
@@ -19,7 +20,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         for device in gateway.XIAOMI_DEVICES['binary_sensor']:
             model = device['model']
             if (model == 'motion'):
-                add_devices([XiaomiMotionSensor(device, gateway)])
+                add_devices([XiaomiMotionSensor(device, gateway, hass)])
             elif (model == 'magnet'):
                 add_devices([XiaomiDoorSensor(device, gateway)])
             elif (model == 'switch'):
@@ -61,15 +62,12 @@ class XiaomiDevice(Entity):
 class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
     """Representation of a XiaomiMotionSensor."""
 
-    def __init__(self, device, xiaomi_hub):
+    def __init__(self, device, xiaomi_hub, hass):
         """Initialize the XiaomiMotionSensor."""
         self._state = False
         self._battery = -1
+        self._hass = hass
         XiaomiDevice.__init__(self, device, 'Motion Sensor', xiaomi_hub)
-
-    @property
-    def should_poll(self):
-        return True
 
     @property
     def sensor_class(self):
@@ -88,6 +86,7 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
                     return False
                 else:
                     self._state = True
+                    self._hass.loop.create_task(self.async_poll_status())
                     return True
             elif value == 'no_motion':
                 if self._state == False: 
@@ -122,6 +121,12 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
     def update(self):
         data = self.xiaomi_hub.get_from_hub(self._sid)
         self.push_data(data)
+
+    @asyncio.coroutine
+    def async_poll_status(self):
+        while self._state == True:
+            yield from asyncio.sleep(10)
+            self.update()
 
 class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
     """Representation of a XiaomiDoorSensor."""

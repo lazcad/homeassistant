@@ -242,16 +242,19 @@ class XiaomiGateway:
         for sid in sids:
             cmd = '{"cmd":"read","sid":"' + sid + '"}'
             resp = self._send_cmd(cmd, "read_ack")
+
+            data = json.loads(resp["data"])
+            if "error" in data:
+                _LOGGER.error("Not a device")
+                continue
+
             model = resp["model"]
-            
-            if model == '':
-                model = 'cube'
 
             xiaomi_device = {
                 "model":model, 
                 "sid":resp["sid"], 
                 "short_id":resp["short_id"], 
-                "data":json.loads(resp["data"])}
+                "data":data}
 
             device_type = None
             if model in sensors:
@@ -306,8 +309,15 @@ class XiaomiGateway:
 
     def get_from_hub(self, sid):
         cmd = '{ "cmd":"read","sid":"' + sid + '"}'
-        resp = self._send_cmd(cmd, "read_ack")   
-        return json.loads(resp["data"])
+        resp = self._send_cmd(cmd, "read_ack")
+        if "data" in resp:
+            data = resp["data"]
+            try:
+                return json.loads(resp["data"])
+            except Exception as e:
+                _LOGGER.error('Cannot process message got from hub : {0}'.format(data))
+        else:
+            _LOGGER.error('No data in response from hub {0}'.format(resp))
 
     def _get_key(self):
         from Crypto.Cipher import AES
