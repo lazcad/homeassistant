@@ -94,6 +94,45 @@ Installation (Raspberry Pi)
       service: switch.toggle
       entity_id: switch.wall_switch_left_158d000xxxxx01
   ```
+  
+    ```yaml
+	#trigger for motion sensor using State
+	
+    trigger:
+      platform: state
+      entity_id: binary_sensor.motion_sensor_158d000xxxxxc2
+      from: 'no_motion'
+	  to: 'motion'
+	  
+	#trigger for motion sensor using Event
+	
+    trigger:
+      platform: event
+      event_type: motion_action
+      event_data:
+          entity_id: binary_sensor.motion_sensor_158d000xxxxxc2
+          action_type: motion #motion / no_motion
+  ```
+  
+      ```yaml
+	#trigger for door window sensor using State
+	
+    trigger:
+      platform: state
+      entity_id: binary_sensor.door_window_sensor_158d000xxxxxc2
+      from: 'no_motion'
+	  to: 'motion'
+	  
+	#trigger for door window sensor using Event
+	
+    trigger:
+      platform: event
+      event_type: door_window_action
+      event_data:
+          entity_id: binary_sensor.door_window_sensor_158d000xxxxxc2
+          action_type: open # open / close / no_close
+  ```
+  
 6. For Cube, use the following trigger. Available actions are flip90, flip180, move, tap_twice, shake_air, swing, alert, free_fall and rotate
 
  ```yaml
