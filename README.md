@@ -80,7 +80,7 @@ Installation (Raspberry Pi)
           friendly_name: Door Sensor
   ```
         
-5. Add automation. For the Button and Switch, use the following event. Available click types are 'single', 'double' and 'hold'
+5. Add automation. For the Button and Switch, use the following event. Available click types are 'single', 'double' and 'hold'. For door window sensor and motion sensor, you can use State or Event as trigger
   ```yaml
   automation:
   - alias: Turn on Dining Light when click
@@ -95,8 +95,8 @@ Installation (Raspberry Pi)
       entity_id: switch.wall_switch_left_158d000xxxxx01
   ```
   
-    ```yaml
-	#trigger for motion sensor using State
+  ```yaml
+    #trigger for motion sensor using State
 	
     trigger:
       platform: state
@@ -104,7 +104,7 @@ Installation (Raspberry Pi)
       from: 'no_motion'
 	  to: 'motion'
 	  
-	#trigger for motion sensor using Event
+    #trigger for motion sensor using Event
 	
     trigger:
       platform: event
@@ -114,8 +114,8 @@ Installation (Raspberry Pi)
           action_type: motion #motion / no_motion
   ```
   
-      ```yaml
-	#trigger for door window sensor using State
+  ```yaml
+    #trigger for door window sensor using State
 	
     trigger:
       platform: state
