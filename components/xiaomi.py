@@ -7,6 +7,7 @@ import socket
 import json
 import logging
 import struct
+import platform
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 from threading import Thread
@@ -98,6 +99,9 @@ class XiaomiComponent:
 
     def discoverGateways(self):
         _socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if self._interface != 'any':
+            _socket.bind((self._interface, 0))
+
         try:
             _LOGGER.info('Discovering Xiaomi Gateways')
             _socket.sendto('{"cmd":"whois"}'.encode(), (self.MULTICAST_ADDRESS, self.GATEWAY_DISCOVERY_PORT))
@@ -138,7 +142,11 @@ class XiaomiComponent:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         if self._interface != 'any':
-            sock.bind((self._interface, self.MULTICAST_PORT))
+            if platform.system() != "Windows":
+                sock.bind((self.MULTICAST_ADDRESS, self.MULTICAST_PORT))
+            else:
+                sock.bind((self._interface, self.MULTICAST_PORT))
+
             mreq = socket.inet_aton(self.MULTICAST_ADDRESS) + socket.inet_aton(self._interface)
         else:
             sock.bind((self.MULTICAST_ADDRESS, self.MULTICAST_PORT))
