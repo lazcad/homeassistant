@@ -55,7 +55,7 @@ class XiaomiSensor(XiaomiDevice, Entity):
         """Initialize the XiaomiSensor."""
         self.current_value = 0
         self._data_key = data_key
-        self._battery = -1
+        self._battery = None
         XiaomiDevice.__init__(self, device, name, xiaomi_hub)
 
     @property

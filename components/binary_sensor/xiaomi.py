@@ -65,7 +65,7 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
     def __init__(self, device, xiaomi_hub, hass):
         """Initialize the XiaomiMotionSensor."""
         self._state = False
-        self._battery = -1
+        self._battery = None
         self._hass = hass
         XiaomiDevice.__init__(self, device, 'Motion Sensor', xiaomi_hub)
 
@@ -136,7 +136,7 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
     def __init__(self, device, xiaomi_hub):
         """Initialize the XiaomiDoorSensor."""
         self._state = False
-        self._battery = -1
+        self._battery = None
         XiaomiDevice.__init__(self, device, 'Door Window Sensor', xiaomi_hub)
 
     @property
