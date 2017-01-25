@@ -73,14 +73,14 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
         if self._data_key not in data:
             return False
 
-        if data['rgb'] == 0:
-            if self._state == False:
+        if data[self._data_key] == 0:
+            if not self._state:
                 return False
             else:
                 self._state = False
                 return True
 
-        rgbhexstr = "%x" % data['rgb']
+        rgbhexstr = "%x" % data[self._data_key]
         if len(rgbhexstr) == 7:
             # fromhex can't deal with odd strings
             rgbhexstr = '0' + rgbhexstr

@@ -205,7 +205,7 @@ class XiaomiComponent:
                     self.hass.add_job(self._push_data, gateway, data)
                 else:
                     _LOGGER.error('Unknown multicast data : {0}'.format(data))
-            except Exception as e:
+            except Exception:
                 _LOGGER.error('Cannot process multicast message : {0}'.format(data))
                 raise
 
@@ -313,7 +313,7 @@ class XiaomiGateway:
         cmd['data'] = data
         cmd = json.dumps(cmd)
         resp = self._send_cmd(cmd, "write_ack")
-        if resp is None:
+        if not resp or 'data' not in resp:
             return False
         data = resp['data']
         if 'error' in data:
@@ -331,7 +331,7 @@ class XiaomiGateway:
         data = resp["data"]
         try:
             return json.loads(resp["data"])
-        except Exception as e:
+        except Exception:
             _LOGGER.error('Cannot process message got from hub : {0}'.format(data))
 
     def _get_key(self):

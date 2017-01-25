@@ -82,21 +82,21 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         if 'status' in data:
             value = data['status']
             if value == 'motion':
-                if self._state == True:
+                if self._state:
                     return False
                 else:
                     self._state = True
                     self._hass.loop.create_task(self.async_poll_status())
                     return True
             elif value == 'no_motion':
-                if self._state == False:
+                if not self._state:
                     return False
                 else:
                     self._state = False
                     return True
 
         if 'no_motion' in data:
-            if self._state == True:
+            if self._state:
                 self._state = False
                 return True
             else:
@@ -126,7 +126,7 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
 
     @asyncio.coroutine
     def async_poll_status(self):
-        while self._state == True:
+        while self._state:
             yield from asyncio.sleep(10)
             self.update()
 
@@ -154,14 +154,14 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
 
         value = data['status']
         if value == 'open' or value == 'no_close':
-            if self._state == True:
+            if self._state:
                 return False
             else:
                 self._state = True
                 return True
 
         if value == 'close':
-            if self._state == True:
+            if self._state:
                 self._state = False
                 return True
             else:
