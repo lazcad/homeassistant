@@ -19,7 +19,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             model = device['model']
             if (model == 'sensor_ht'):
                 add_devices([
-                    XiaomiSensor(device, 'Temperature', 'temperature', gateway), 
+                    XiaomiSensor(device, 'Temperature', 'temperature', gateway),
                     XiaomiSensor(device, 'Humidity', 'humidity', gateway)])
 
 class XiaomiDevice(Entity):
@@ -66,7 +66,7 @@ class XiaomiSensor(XiaomiDevice, Entity):
     @property
     def unit_of_measurement(self):
         if self._data_key == 'temperature':
-            return TEMP_CELSIUS 
+            return TEMP_CELSIUS
         elif self._data_key == 'humidity':
             return '%'
 
@@ -80,7 +80,7 @@ class XiaomiSensor(XiaomiDevice, Entity):
 
     def push_data(self, data):
         """Push from Hub"""
-        if self.parse_data(data) == True:
+        if self.parse_data(data):
             self.schedule_update_ha_state()
 
         if 'battery' in data:
@@ -95,5 +95,7 @@ class XiaomiSensor(XiaomiDevice, Entity):
 
     def update(self):
         data = self.xiaomi_hub.get_from_hub(self._sid)
+        if data is None:
+            return
         self.push_data(data)
 
