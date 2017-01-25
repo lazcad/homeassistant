@@ -231,15 +231,18 @@ class XiaomiGateway:
 
         self._socket = socket
 
-        _LOGGER.info('Discovering Xiaomi Devices')
-        self._discover_devices()
+        trycount = 5
+        for _ in range(trycount):
+            _LOGGER.info('Discovering Xiaomi Devices')
+            if self._discover_devices():
+                break
 
     def _discover_devices(self):
 
         cmd = '{"cmd" : "get_id_list"}'
         resp = self._send_cmd(cmd, "get_id_list_ack")
         if resp is None:
-            return
+            return False
         self.GATEWAY_TOKEN = resp["token"]
         sids = json.loads(resp["data"])
         sids.append(self.GATEWAY_SID)
@@ -283,6 +286,7 @@ class XiaomiGateway:
                 _LOGGER.error('Unsupported devices : {0}'.format(model))
             else:
                 self.XIAOMI_DEVICES[device_type].append(xiaomi_device)
+        return True
 
     def _send_cmd(self, cmd, rtnCmd):
         try:
