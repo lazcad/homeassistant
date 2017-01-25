@@ -313,7 +313,7 @@ class XiaomiGateway:
         cmd['data'] = data
         cmd = json.dumps(cmd)
         resp = self._send_cmd(cmd, "write_ack")
-        if not resp or 'data' not in resp:
+        if resp is None or 'data' not in resp:
             return False
         data = resp['data']
         if 'error' in data:
@@ -325,7 +325,7 @@ class XiaomiGateway:
     def get_from_hub(self, sid):
         cmd = '{ "cmd":"read","sid":"' + sid + '"}'
         resp = self._send_cmd(cmd, "read_ack")
-        if not resp or "data" not in resp:
+        if resp is None or "data" not in resp:
             _LOGGER.error('No data in response from hub {0}'.format(resp))
             return
         data = resp["data"]
