@@ -121,7 +121,8 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
     def update(self):
         data = self.xiaomi_hub.get_from_hub(self._sid)
         if data is None:
-            return
+            self._state = False
+            self.schedule_update_ha_state()
         self.push_data(data)
 
     @asyncio.coroutine
