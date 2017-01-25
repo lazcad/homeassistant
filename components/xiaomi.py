@@ -210,10 +210,10 @@ class XiaomiComponent:
                 raise
 
     def _push_data(self, gateway, data):
-        sid = data['sid']
         jdata = json.loads(data['data'])
         if jdata is None:
             return
+        sid = data['sid']
         for device in gateway.XIAOMI_HA_DEVICES[sid]:
             device.push_data(jdata)
 

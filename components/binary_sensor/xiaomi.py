@@ -82,11 +82,11 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         if 'status' in data:
             value = data['status']
             if value == 'motion':
+                self._hass.loop.create_task(self.async_poll_status())
                 if self._state:
                     return False
                 else:
                     self._state = True
-                    self._hass.loop.create_task(self.async_poll_status())
                     return True
             elif value == 'no_motion':
                 if not self._state:
@@ -126,9 +126,8 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
 
     @asyncio.coroutine
     def async_poll_status(self):
-        while self._state:
-            yield from asyncio.sleep(10)
-            self.update()
+        yield from asyncio.sleep(10)
+        self.update()
 
 class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
     """Representation of a XiaomiDoorSensor."""
@@ -205,9 +204,8 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
         if state == 'long_click_press':
             self._is_down = True
             self.schedule_update_ha_state()
-            return
-
-        if state == 'long_click_release':
+            click_type = 'long_click_press'
+        elif state == 'long_click_release':
             self._is_down = False
             self.schedule_update_ha_state()
             click_type = 'hold'
