@@ -301,7 +301,7 @@ class XiaomiGateway:
             if resp['cmd'] == rtnCmd:
                 return resp
             else:
-                _LOGGER.error("Response does not match return cmd. Expected {0}".format(resp['cmd']))
+                _LOGGER.error("Response does not match return cmd. Got {0}".format(resp['cmd']))
         except socket.timeout:
             _LOGGER.error("Cannot connect to Gateway")
             return
