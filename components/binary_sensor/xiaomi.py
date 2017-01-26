@@ -6,8 +6,8 @@ Developed by Rave from Lazcad.com
 import logging
 import asyncio
 
-from homeassistant.helpers.entity import Entity
 from homeassistant.components.binary_sensor import (BinarySensorDevice)
+from homeassistant.components.xiaomi import XiaomiDevice
 from homeassistant.const import ATTR_BATTERY_LEVEL
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,38 +34,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
                 devices.append(XiaomiButton(device, 'Wall Switch (Left)', 'channel_0', hass, gateway),
                     XiaomiButton(device, 'Wall Switch (Right)', 'channel_1', hass, gateway))
     add_devices(devices)
-
-class XiaomiDevice(Entity):
-    """Representation a base Xiaomi device."""
-
-    def __init__(self, device, name, xiaomi_hub):
-        """Initialize the xiaomi device."""
-        self._sid = device['sid']
-        self._name = '{}_{}'.format(name, self._sid)
-        self.parse_data(device['data'])
-        self.xiaomi_hub = xiaomi_hub
-        self._device_state_attributes = {}
-        xiaomi_hub.XIAOMI_HA_DEVICES[self._sid].append(self)
-
-    @property
-    def name(self):
-        """Return the name of the device."""
-        return self._name
-
-    @property
-    def should_poll(self):
-        return False
-
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes."""
-        return self._device_state_attributes
-
-    def push_data(self, data):
-        raise NotImplementedError()
-
-    def parse_data(self, data):
-        raise NotImplementedError()
 
         
 class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
