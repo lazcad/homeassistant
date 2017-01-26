@@ -21,7 +21,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         for device in gateway.XIAOMI_DEVICES['binary_sensor']:
             model = device['model']
             if (model == 'motion'):
-                devices.append(XiaomiMotionSensor(device, gateway, hass))
+                devices.append(XiaomiMotionSensor(device, hass, gateway))
             elif (model == 'magnet'):
                 devices.append(XiaomiDoorSensor(device, gateway))
             elif (model == 'switch'):
@@ -39,7 +39,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
 class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
     """Representation of a XiaomiMotionSensor."""
 
-    def __init__(self, device, xiaomi_hub, hass):
+    def __init__(self, device, hass, xiaomi_hub):
         """Initialize the XiaomiMotionSensor."""
         self._state = False
         self._hass = hass
