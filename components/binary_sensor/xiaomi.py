@@ -15,23 +15,25 @@ _LOGGER = logging.getLogger(__name__)
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
 
+    devices = []
     XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
     for (ip, gateway) in XIAOMI_GATEWAYS.items():
         for device in gateway.XIAOMI_DEVICES['binary_sensor']:
             model = device['model']
             if (model == 'motion'):
-                add_devices([XiaomiMotionSensor(device, gateway, hass)])
+                devices.append(XiaomiMotionSensor(device, gateway, hass))
             elif (model == 'magnet'):
-                add_devices([XiaomiDoorSensor(device, gateway)])
+                devices.append(XiaomiDoorSensor(device, gateway))
             elif (model == 'switch'):
-                add_devices([XiaomiButton(device, 'Switch', 'status', hass, gateway)])
+                devices.append(XiaomiButton(device, 'Switch', 'status', hass, gateway))
             elif (model == 'cube'):
-                add_devices([XiaomiCube(device, hass, gateway)])
+                devices.append(XiaomiCube(device, hass, gateway))
             elif (model == '86sw1'):
-                add_devices([XiaomiButton(device, 'Wall Switch', 'channel_0', hass, gateway)])
+                devices.append(XiaomiButton(device, 'Wall Switch', 'channel_0', hass, gateway))
             elif (model == '86sw2'):
-                add_devices([XiaomiButton(device, 'Wall Switch (Left)', 'channel_0', hass, gateway),
-                    XiaomiButton(device, 'Wall Switch (Right)', 'channel_1', hass, gateway)])
+                devices.append(XiaomiButton(device, 'Wall Switch (Left)', 'channel_0', hass, gateway),
+                    XiaomiButton(device, 'Wall Switch (Right)', 'channel_1', hass, gateway))
+    add_devices(devices)
 
 class XiaomiDevice(Entity):
     """Representation a base Xiaomi device."""
@@ -42,6 +44,7 @@ class XiaomiDevice(Entity):
         self._name = '{}_{}'.format(name, self._sid)
         self.parse_data(device['data'])
         self.xiaomi_hub = xiaomi_hub
+        self._device_state_attributes = {}
         xiaomi_hub.XIAOMI_HA_DEVICES[self._sid].append(self)
 
     @property
@@ -53,19 +56,24 @@ class XiaomiDevice(Entity):
     def should_poll(self):
         return False
 
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes."""
+        return self._device_state_attributes
+
     def push_data(self, data):
-        return True
+        raise NotImplementedError()
 
     def parse_data(self, data):
-        return True
+        raise NotImplementedError()
 
+        
 class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
     """Representation of a XiaomiMotionSensor."""
 
     def __init__(self, device, xiaomi_hub, hass):
         """Initialize the XiaomiMotionSensor."""
         self._state = False
-        self._battery = None
         self._hass = hass
         XiaomiDevice.__init__(self, device, 'Motion Sensor', xiaomi_hub)
 
@@ -102,20 +110,13 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
             else:
                 return False
 
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes."""
-        return {
-            ATTR_BATTERY_LEVEL: self._battery,
-        }
-
     def push_data(self, data):
         """Push from Hub"""
         if self.parse_data(data):
             self.schedule_update_ha_state()
 
         if 'battery' in data:
-            self._battery = data['battery']
+            self._device_state_attributes[ATTR_BATTERY_LEVEL] = data['battery']
 
     #For Polling
     def update(self):
@@ -132,13 +133,13 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         yield from asyncio.sleep(10)
         self.update()
 
+
 class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
     """Representation of a XiaomiDoorSensor."""
 
     def __init__(self, device, xiaomi_hub):
         """Initialize the XiaomiDoorSensor."""
         self._state = False
-        self._battery = None
         XiaomiDevice.__init__(self, device, 'Door Window Sensor', xiaomi_hub)
 
     @property
@@ -169,20 +170,14 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
             else:
                 return False
 
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes."""
-        return {
-            ATTR_BATTERY_LEVEL: self._battery,
-        }
-
     def push_data(self, data):
         """Push from Hub"""
         if self.parse_data(data):
             self.schedule_update_ha_state()
 
         if 'battery' in data:
-            self._battery = data['battery']
+            self._device_state_attributes[ATTR_BATTERY_LEVEL] = data['battery']
+
 
 class XiaomiButton(XiaomiDevice, BinarySensorDevice):
 
@@ -221,6 +216,7 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
             'entity_id': self.entity_id,
             'click_type': click_type
         })
+
 
 class XiaomiCube(XiaomiDevice, BinarySensorDevice):
 
