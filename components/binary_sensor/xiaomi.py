@@ -8,7 +8,6 @@ import asyncio
 
 from homeassistant.components.binary_sensor import (BinarySensorDevice)
 from homeassistant.components.xiaomi import XiaomiDevice
-from homeassistant.const import ATTR_BATTERY_LEVEL
 
 _LOGGER = logging.getLogger(__name__)
 
