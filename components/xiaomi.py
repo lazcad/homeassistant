@@ -13,6 +13,7 @@ import homeassistant.helpers.config_validation as cv
 from threading import Thread
 from collections import defaultdict
 from homeassistant.helpers import discovery
+from homeassistant.helpers.entity import Entity
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 
 REQUIREMENTS = ['pyCrypto']
@@ -344,3 +345,36 @@ class XiaomiGateway:
         encryptor = AES.new(self.GATEWAY_KEY, AES.MODE_CBC, IV=IV)
         ciphertext = encryptor.encrypt(self.GATEWAY_TOKEN)
         return ''.join('{:02x}'.format(x) for x in ciphertext)
+
+
+class XiaomiDevice(Entity):
+    """Representation a base Xiaomi device."""
+
+    def __init__(self, device, name, xiaomi_hub):
+        """Initialize the xiaomi device."""
+        self._sid = device['sid']
+        self._name = '{}_{}'.format(name, self._sid)
+        self.parse_data(device['data'])
+        self.xiaomi_hub = xiaomi_hub
+        self._device_state_attributes = {}
+        xiaomi_hub.XIAOMI_HA_DEVICES[self._sid].append(self)
+
+    @property
+    def name(self):
+        """Return the name of the device."""
+        return self._name
+
+    @property
+    def should_poll(self):
+        return False
+
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes."""
+        return self._device_state_attributes
+
+    def push_data(self, data):
+        raise NotImplementedError()
+
+    def parse_data(self, data):
+        raise NotImplementedError()
