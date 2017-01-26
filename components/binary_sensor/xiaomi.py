@@ -76,8 +76,9 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
             else:
                 return False
 
-    #For Polling
-    def update(self):
+    @asyncio.coroutine
+    def async_poll_status(self):
+        yield from asyncio.sleep(10)
         data = self.xiaomi_hub.get_from_hub(self._sid)
         if data is None:
             if self._state:
@@ -85,11 +86,6 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
                 self.schedule_update_ha_state()
             return
         self.push_data(data)
-
-    @asyncio.coroutine
-    def async_poll_status(self):
-        yield from asyncio.sleep(10)
-        self.update()
 
 
 class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
