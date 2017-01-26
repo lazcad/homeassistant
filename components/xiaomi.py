@@ -374,7 +374,12 @@ class XiaomiDevice(Entity):
         return self._device_state_attributes
 
     def push_data(self, data):
-        raise NotImplementedError()
+        """Push from Hub"""
+        if self.parse_data(data):
+            self.schedule_update_ha_state()
+
+        if 'battery' in data:
+            self._device_state_attributes[ATTR_BATTERY_LEVEL] = data['battery']
 
     def parse_data(self, data):
         raise NotImplementedError()
