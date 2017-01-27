@@ -146,17 +146,22 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
         if value is None:
             return False
 
-        click_type = value
+        if value == 'long_click_press':
+            self._is_down = True
+            click_type = 'long_click_press'
+        elif value == 'long_click_release':
+            self._is_down = False
+            click_type = 'hold'
+        elif value == 'click':
+            click_type = 'single'
+        elif value == 'double_click':
+            click_type = 'double'
+
         self._hass.bus.fire('click', {
             'entity_id': self.entity_id,
             'click_type': click_type
         })
-
-        if value == 'long_click_press':
-            self._is_down = True
-            return True
-        elif value == 'long_click_release':
-            self._is_down = False
+        if value in ['long_click_press', 'long_click_release']:
             return True
         return False
 

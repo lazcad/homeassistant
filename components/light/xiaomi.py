@@ -71,14 +71,14 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
         return True
 
     @property
-    def rgb_color(self):
-        """Return the RBG color value."""
-        return self._rgb
-
-    @property
     def brightness(self):
         """Return the brightness of this light between 0..255."""
         return self._brightness
+
+    @property
+    def rgb_color(self):
+        """Return the RBG color value."""
+        return self._rgb
 
     @property
     def is_on(self):
