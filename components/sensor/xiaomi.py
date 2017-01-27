@@ -49,7 +49,6 @@ class XiaomiSensor(XiaomiDevice):
     def parse_data(self, data):
         if self._data_key not in data:
             return False
-
         value = data[self._data_key]
         self.current_value = int(value) / 100
         return True

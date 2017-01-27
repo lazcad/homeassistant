@@ -45,6 +45,7 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         """Initialize the XiaomiMotionSensor."""
         self._state = False
         self._hass = hass
+        self._data_key = 'status'
         XiaomiDevice.__init__(self, device, 'Motion Sensor', xiaomi_hub)
 
     @property
@@ -57,28 +58,29 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         return self._state
 
     def parse_data(self, data):
-        if 'status' in data:
-            value = data['status']
-            if value == 'motion':
-                self._hass.loop.create_task(self.async_poll_status())
-                if self._state:
-                    return False
-                else:
-                    self._state = True
-                    return True
-            elif value == 'no_motion':
-                if not self._state:
-                    return False
-                else:
-                    self._state = False
-                    return True
-
         if 'no_motion' in data:
             if self._state:
                 self._state = False
                 return True
             else:
                 return False
+
+        if self._data_key not in data:
+            return False
+        value = data[self._data_key]
+        if value == 'motion':
+            self._hass.loop.create_task(self.async_poll_status())
+            if self._state:
+                return False
+            else:
+                self._state = True
+                return True
+        elif value == 'no_motion':
+            if not self._state:
+                return False
+            else:
+                self._state = False
+                return True
 
     @asyncio.coroutine
     def async_poll_status(self):
@@ -94,6 +96,7 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
     def __init__(self, device, xiaomi_hub):
         """Initialize the XiaomiDoorSensor."""
         self._state = False
+        self._data_key = 'status'
         XiaomiDevice.__init__(self, device, 'Door Window Sensor', xiaomi_hub)
 
     @property
@@ -106,18 +109,17 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
         return self._state
 
     def parse_data(self, data):
-        if 'status' not in data:
+        if self._data_key not in data:
             return False
 
-        value = data['status']
+        value = data[self._data_key]
         if value == 'open' or value == 'no_close':
             if self._state:
                 return False
             else:
                 self._state = True
                 return True
-
-        if value == 'close':
+        elif value == 'close':
             if self._state:
                 self._state = False
                 return True
@@ -168,6 +170,7 @@ class XiaomiCube(XiaomiDevice, BinarySensorDevice):
 
     STATUS = 'status'
     ROTATE = 'rotate'
+    # flip90, flip180, move, tap_twice, shake_air, swing, alert
 
     def __init__(self, device, hass, xiaomi_hub):
         """Initialize the XiaomiButton."""
@@ -181,6 +184,7 @@ class XiaomiCube(XiaomiDevice, BinarySensorDevice):
 
     def parse_data(self, data):
         """Push from Hub"""
+        print(data)
         if self.STATUS in data:
             self._hass.bus.fire('cube_action', {
                 'entity_id': self.entity_id,
