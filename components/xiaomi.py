@@ -201,13 +201,14 @@ class XiaomiComponent:
                 if cmd == 'heartbeat' and data['model'] == 'gateway':
                     gateway.update_key(data['token'])
                 elif cmd == 'report' or cmd == 'heartbeat':
+                    _LOGGER.debug('Received data {0}'.format(data))
                     self.hass.add_job(gateway.push_data, data)
+
                 else:
                     _LOGGER.error('Unknown multicast data : {0}'.format(data))
             except Exception:
                 _LOGGER.error('Cannot process multicast message : {0}'.format(data))
                 continue
-
 
 class XiaomiGateway:
 
