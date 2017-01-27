@@ -70,17 +70,17 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
         XiaomiDevice.__init__(self, device, name, xiaomi_hub)
 
     def parse_data(self, data):
-        if not self._data_key in data:
+        if self._data_key not in data:
             return False
 
-        if data['rgb'] == 0:
-            if self._state == False:
+        if data[self._data_key] == 0:
+            if not self._state:
                 return False
             else:
                 self._state = False
                 return True
 
-        rgbhexstr = "%x" % data['rgb']
+        rgbhexstr = "%x" % data[self._data_key]
         if len(rgbhexstr) == 7:
             # fromhex can't deal with odd strings
             rgbhexstr = '0' + rgbhexstr
@@ -98,11 +98,13 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
 
     def push_data(self, data):
         """Push from Hub"""
-        if self.parse_data(data) == True:
+        if self.parse_data(data):
             self.schedule_update_ha_state()
 
     def update(self):
         data = self.xiaomi_hub.get_from_hub(self._sid)
+        if data is None:
+            return
         self.push_data(data)
 
     @property

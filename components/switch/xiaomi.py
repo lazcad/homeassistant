@@ -24,7 +24,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
                 add_devices([XiaomiGenericSwitch(device, 'Wall Switch', 'channel_0', gateway)])
             elif (model == 'ctrl_neutral2'):
                 add_devices([
-                    XiaomiGenericSwitch(device, 'Wall Switch Left','channel_0', gateway), 
+                    XiaomiGenericSwitch(device, 'Wall Switch Left','channel_0', gateway),
                     XiaomiGenericSwitch(device, 'Wall Switch Right', 'channel_1', gateway)])
 
 class XiaomiDevice(Entity):
@@ -65,7 +65,7 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
     @property
     def icon(self):
         if self._data_key == 'status':
-           return 'mdi:power-plug'
+            return 'mdi:power-plug'
         else:
             return 'mdi:power-socket'
 
@@ -74,7 +74,7 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
         """Return true if plug is on."""
         return self._state
 
-    def turn_on(self, **kwargs):    
+    def turn_on(self, **kwargs):
         """Turn the switch on."""
         if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'on'):
             self._state = True
@@ -93,7 +93,7 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
             self.turn_off()
 
     def parse_data(self, data):
-        if not self._data_key in data:
+        if self._data_key not in data:
             return False
 
         state = True if data[self._data_key] == 'on' else False
@@ -105,9 +105,11 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
 
     def push_data(self, data):
         """Push from Hub"""
-        if self.parse_data(data) == True:
+        if self.parse_data(data):
             self.schedule_update_ha_state()
 
     def update(self):
         data = self.xiaomi_hub.get_from_hub(self._sid)
+        if data is None:
+            return
         self.push_data(data)
