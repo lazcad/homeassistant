@@ -15,9 +15,9 @@ _LOGGER = logging.getLogger(__name__)
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
-
     devices = []
-    for ip, gateway in hass.data['XIAOMI_GATEWAYS']:
+    XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
+    for (ip, gateway) in XIAOMI_GATEWAYS.items():
         for device in gateway.XIAOMI_DEVICES['switch']:
             model = device['model']
             if (model == 'plug'):
@@ -62,10 +62,11 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
             self._state = False
 
     def parse_data(self, data):
-        if self._data_key not in data:
+        value = data.get(self._data_key)
+        if value is None:
             return False
 
-        state = data[self._data_key] == 'on'
+        state = value == 'on'
         if self._state == state:
             return False
         else:

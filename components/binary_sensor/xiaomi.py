@@ -17,9 +17,9 @@ _LOGGER = logging.getLogger(__name__)
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
-
     devices = []
-    for (ip, gateway) in hass.data['XIAOMI_GATEWAYS'].items():
+    XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
+    for (ip, gateway) in XIAOMI_GATEWAYS.items():
         for device in gateway.XIAOMI_DEVICES['binary_sensor']:
             model = device['model']
             if (model == 'motion'):
@@ -65,9 +65,9 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
             else:
                 return False
 
-        if self._data_key not in data:
+        value = data.get(self._data_key)
+        if value is None:
             return False
-        value = data[self._data_key]
         if value == 'motion':
             self._hass.loop.create_task(self.async_poll_status())
             if self._state:
@@ -109,10 +109,10 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
         return self._state
 
     def parse_data(self, data):
-        if self._data_key not in data:
+        value = data.get(self._data_key)
+        if value is None:
             return False
 
-        value = data[self._data_key]
         if value == 'open' or value == 'no_close':
             if self._state:
                 return False
@@ -142,26 +142,26 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
         return self._is_down
 
     def parse_data(self, data):
-        if self._data_key not in data:
+        value = data.get(self._data_key)
+        if value is None:
             return False
 
-        state = data[self._data_key]
-        if state == 'long_click_press':
+        if value == 'long_click_press':
             self._is_down = True
             click_type = 'long_click_press'
-        elif state == 'long_click_release':
+        elif value == 'long_click_release':
             self._is_down = False
             click_type = 'hold'
-        elif state == 'click':
+        elif value == 'click':
             click_type = 'single'
-        elif state == 'double_click':
+        elif value == 'double_click':
             click_type = 'double'
 
         self._hass.bus.fire('click', {
             'entity_id': self.entity_id,
             'click_type': click_type
         })
-        if state in ('long_click_press', 'long_click_release'):
+        if value in ['long_click_press', 'long_click_release']:
             return True
         return False
 
@@ -170,7 +170,6 @@ class XiaomiCube(XiaomiDevice, BinarySensorDevice):
 
     STATUS = 'status'
     ROTATE = 'rotate'
-    # flip90, flip180, move, tap_twice, shake_air, swing, alert
 
     def __init__(self, device, hass, xiaomi_hub):
         """Initialize the XiaomiButton."""
@@ -184,7 +183,6 @@ class XiaomiCube(XiaomiDevice, BinarySensorDevice):
 
     def parse_data(self, data):
         """Push from Hub"""
-        print(data)
         if self.STATUS in data:
             self._hass.bus.fire('cube_action', {
                 'entity_id': self.entity_id,

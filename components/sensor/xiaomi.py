@@ -16,7 +16,8 @@ _LOGGER = logging.getLogger(__name__)
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
     devices = []
-    for (ip, gateway) in hass.data['XIAOMI_GATEWAYS']:
+    XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
+    for (ip, gateway) in XIAOMI_GATEWAYS.items():
         for device in gateway.XIAOMI_DEVICES['sensor']:
             if device['model'] == 'sensor_ht':
                 devices.append(XiaomiSensor(device, 'Temperature', 'temperature', gateway))
@@ -47,8 +48,8 @@ class XiaomiSensor(XiaomiDevice):
             return '%'
 
     def parse_data(self, data):
-        if self._data_key not in data:
+        value = data.get(self._data_key)
+        if value is None:
             return False
-        value = data[self._data_key]
         self.current_value = int(value) / 100
         return True

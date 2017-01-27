@@ -341,6 +341,7 @@ class XiaomiGateway:
         if 'error' in data['data']:
             _LOGGER.error('Invalid Key, {0}'.format(data))
             return False
+        return True
 
 class XiaomiDevice(Entity):
     """Representation a base Xiaomi device."""

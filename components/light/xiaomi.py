@@ -21,7 +21,8 @@ _LOGGER = logging.getLogger(__name__)
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
     devices = []
-    for (ip, gateway) in hass.data['XIAOMI_GATEWAYS']:
+    XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
+    for (ip, gateway) in XIAOMI_GATEWAYS.items():
         for device in gateway.XIAOMI_DEVICES['light']:
             model = device['model']
             if (model == 'gateway'):
@@ -38,27 +39,23 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
 
         self._state = False
         self._rgb = (255,255,255)
-        self._ct = None
         self._brightness = 180
-        self._xy_color = (.5, .5)
-        self._white = 200
-        self._effect_list = None
-        self._effect = None
 
         XiaomiDevice.__init__(self, device, name, xiaomi_hub)
 
     def parse_data(self, data):
-        if self._data_key not in data:
+        value = data.get(self._data_key)
+        if value is None:
             return False
 
-        if data[self._data_key] == 0:
-            if not self._state:
+        if value == 0:
+            if self._state:
                 return False
             else:
                 self._state = False
                 return True
 
-        rgbhexstr = "%x" % data[self._data_key]
+        rgbhexstr = "%x" % value
         if len(rgbhexstr) == 7:
             # fromhex can't deal with odd strings
             rgbhexstr = '0' + rgbhexstr
@@ -71,18 +68,7 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
         self._brightness = int(255 * brightness / 100)
         self._rgb = rgb
         self._state = True
-
         return True
-
-    @property
-    def brightness(self):
-        """Return the brightness of this light between 0..255."""
-        return self._brightness
-
-    @property
-    def xy_color(self):
-        """Return the XY color value [float, float]."""
-        return self._xy_color
 
     @property
     def rgb_color(self):
@@ -90,24 +76,9 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
         return self._rgb
 
     @property
-    def color_temp(self):
-        """Return the CT color temperature."""
-        return self._ct
-
-    @property
-    def white_value(self):
-        """Return the white value of this light between 0..255."""
-        return self._white
-
-    @property
-    def effect_list(self):
-        """Return the list of supported effects."""
-        return self._effect_list
-
-    @property
-    def effect(self):
-        """Return the current effect."""
-        return self._effect
+    def brightness(self):
+        """Return the brightness of this light between 0..255."""
+        return self._brightness
 
     @property
     def is_on(self):
