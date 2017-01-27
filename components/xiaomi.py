@@ -215,6 +215,7 @@ class XiaomiComponent:
             return
         sid = data['sid']
         for device in gateway.XIAOMI_HA_DEVICES[sid]:
+            _LOGGER.debug('Received data ({0}): {1}'.format(device.name, jdata))
             device.push_data(jdata)
 
 class XiaomiGateway:
