@@ -15,19 +15,18 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     devices = []
     for (ip, gateway) in hass.data['XIAOMI_GATEWAYS']:
         for device in gateway.XIAOMI_DEVICES['sensor']:
-            model = device['model']
-            if (model == 'sensor_ht'):
+            if device['model'] == 'sensor_ht':
                 devices.append(XiaomiSensor(device, 'Temperature', 'temperature', gateway))
                 devices.append(XiaomiSensor(device, 'Humidity', 'humidity', gateway))
     add_devices(devices)
 
 
-class XiaomiSensor(XiaomiDevice, Entity):
+class XiaomiSensor(XiaomiDevice):
     """Representation of a XiaomiGenericSwitch."""
 
     def __init__(self, device, name, data_key, xiaomi_hub):
         """Initialize the XiaomiSensor."""
-        self.current_value = 0
+        self.current_value = None
         self._data_key = data_key
         self._battery = None
         XiaomiDevice.__init__(self, device, name, xiaomi_hub)
@@ -45,7 +44,7 @@ class XiaomiSensor(XiaomiDevice, Entity):
             return '%'
 
     def parse_data(self, data):
-        if not self._data_key in data:
+        if self._data_key not in data:
             return False
 
         value = data[self._data_key]
