@@ -5,7 +5,10 @@ Developed by Rave from Lazcad.com
 """
 import logging
 
-from homeassistant.components.xiaomi import XiaomiDevice
+try:
+    from homeassistant.components.xiaomi import XiaomiDevice
+except ImportError:
+    from custom_components.xiaomi import XiaomiDevice
 from homeassistant.const import TEMP_CELSIUS
 
 _LOGGER = logging.getLogger(__name__)

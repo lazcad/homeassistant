@@ -6,10 +6,14 @@ Developed by Rave from Lazcad.com
 import logging
 import asyncio
 
-from homeassistant.components.binary_sensor import (BinarySensorDevice)
-from homeassistant.components.xiaomi import XiaomiDevice
+from homeassistant.components.binary_sensor import BinarySensorDevice
+try:
+    from homeassistant.components.xiaomi import XiaomiDevice
+except ImportError:
+    from custom_components.xiaomi import XiaomiDevice
 
 _LOGGER = logging.getLogger(__name__)
+
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
@@ -24,16 +28,16 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
                 devices.append(XiaomiDoorSensor(device, gateway))
             elif (model == 'switch'):
                 devices.append(XiaomiButton(device, 'Switch', 'status', hass, gateway))
-            elif (model == 'cube'):
-                devices.append(XiaomiCube(device, hass, gateway))
             elif (model == '86sw1'):
                 devices.append(XiaomiButton(device, 'Wall Switch', 'channel_0', hass, gateway))
             elif (model == '86sw2'):
                 devices.append(XiaomiButton(device, 'Wall Switch (Left)', 'channel_0', hass, gateway))
                 devices.append(XiaomiButton(device, 'Wall Switch (Right)', 'channel_1', hass, gateway))
+            elif (model == 'cube'):
+                devices.append(XiaomiCube(device, hass, gateway))
     add_devices(devices)
 
-        
+
 class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
     """Representation of a XiaomiMotionSensor."""
 
@@ -79,13 +83,9 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
     @asyncio.coroutine
     def async_poll_status(self):
         yield from asyncio.sleep(10)
-        data = self.xiaomi_hub.get_from_hub(self._sid)
-        if data is None:
-            if self._state:
-                self._state = False
-                self.schedule_update_ha_state()
-            return
-        self.push_data(data)
+        if not self.xiaomi_hub.get_from_hub(self._sid) and self._state:
+            self._state = False
+            self.schedule_update_ha_state()
 
 
 class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
@@ -106,7 +106,7 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
         return self._state
 
     def parse_data(self, data):
-        if not 'status' in data:
+        if 'status' not in data:
             return False
 
         value = data['status']
@@ -138,9 +138,9 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
     def is_on(self):
         """Return true if sensor is on."""
         return self._is_down
-    
+
     def parse_data(self, data):
-        if not self._data_key in data:
+        if self._data_key not in data:
             return False
 
         state = data[self._data_key]

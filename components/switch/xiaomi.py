@@ -5,8 +5,11 @@ Developed by Rave from Lazcad.com
 """
 import logging
 
-from homeassistant.helpers.entity import Entity
-from homeassistant.components.switch import (SwitchDevice)
+from homeassistant.components.switch import SwitchDevice
+try:
+    from homeassistant.components.xiaomi import XiaomiDevice
+except ImportError:
+    from custom_components.xiaomi import XiaomiDevice
 
 _LOGGER = logging.getLogger(__name__)
 

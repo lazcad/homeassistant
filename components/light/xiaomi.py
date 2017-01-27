@@ -6,7 +6,10 @@ Developed by Rave from Lazcad.com
 import logging
 import struct
 import binascii
-from homeassistant.components.xiaomi import XiaomiDevice
+try:
+    from homeassistant.components.xiaomi import XiaomiDevice
+except ImportError:
+    from custom_components.xiaomi import XiaomiDevice
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS, ATTR_COLOR_TEMP, ATTR_EFFECT,
     ATTR_RGB_COLOR, ATTR_WHITE_VALUE, ATTR_XY_COLOR, SUPPORT_BRIGHTNESS,
