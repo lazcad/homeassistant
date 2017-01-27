@@ -202,6 +202,7 @@ class XiaomiComponent:
                 if cmd == 'heartbeat' and data['model'] == 'gateway':
                     gateway.GATEWAY_TOKEN = data['token']
                 elif cmd == 'report' or cmd == 'heartbeat':
+                    _LOGGER.debug('Received data {0}'.format(data))
                     self.hass.add_job(self._push_data, gateway, data)
                 else:
                     _LOGGER.error('Unknown multicast data : {0}'.format(data))
