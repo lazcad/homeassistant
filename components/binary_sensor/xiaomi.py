@@ -193,7 +193,7 @@ class XiaomiCube(XiaomiDevice, BinarySensorDevice):
             self._hass.bus.fire('cube_action', {
                 'entity_id': self.entity_id,
                 'action_type': self.ROTATE,
-                'action_value': data[self.ROTATE]
+                'action_value': float(data[self.ROTATE].replace(",","."))
             })
 
         return False
