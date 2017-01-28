@@ -36,6 +36,27 @@ class XiaomiSensor(XiaomiDevice):
         XiaomiDevice.__init__(self, device, name, xiaomi_hub)
 
     @property
+    def should_poll(self):
+        return False
+
+    @property
+    def is_humidity(self):
+        return self._data_key == 'humidity'
+
+    @property
+    def is_temperature(self):
+        return self._data_key == 'temperature'
+
+    @property
+    def available(self):
+        if self.is_temperature and self.current_value != 100:
+            return True
+        elif self.is_humidity and self.current_value != 0:
+            return True
+
+        return False
+
+    @property
     def state(self):
         """Return the name of the sensor."""
         return self.current_value
