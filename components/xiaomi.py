@@ -201,7 +201,7 @@ class XiaomiComponent:
                 if cmd == 'heartbeat' and data['model'] == 'gateway':
                     gateway.update_key(data['token'])
                 elif cmd == 'report' or cmd == 'heartbeat':
-                    _LOGGER.debug('Received data {0}'.format(data))
+                    _LOGGER.debug('mcast {1} << {0}'.format(data, cmd))
                     self.hass.add_job(gateway.push_data, data)
 
                 else:
@@ -282,8 +282,8 @@ class XiaomiGateway:
     def _send_cmd(self, cmd, rtnCmd):
         try:
             self._socket.settimeout(10.0)
+            _LOGGER.debug(">> %s", cmd.encode())
             self._socket.sendto(cmd.encode(), (self.GATEWAY_IP, self.GATEWAY_PORT))
-            self._socket.settimeout(10.0)
             data, addr = self._socket.recvfrom(1024)
         except socket.timeout:
             _LOGGER.error("Cannot connect to Gateway")
@@ -292,6 +292,7 @@ class XiaomiGateway:
             _LOGGER.error("No response from Gateway")
             return None
         resp = json.loads(data.decode())
+        _LOGGER.debug("<< %s", resp)
         if resp['cmd'] != rtnCmd:
             _LOGGER.error("Response does not match return cmd. Expected {0}, but got {1}.".format(rtnCmd, resp['cmd']))
             return None
@@ -339,7 +340,7 @@ class XiaomiGateway:
             _LOGGER.error('No data in response from hub {0}'.format(data))
             return False
         if 'error' in data['data']:
-            _LOGGER.error('Invalid Key, {0}'.format(data))
+            _LOGGER.error('Got error element in data {0}'.format(data))
             return False
         return True
 
