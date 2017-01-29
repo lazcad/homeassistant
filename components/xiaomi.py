@@ -201,7 +201,7 @@ class XiaomiComponent:
                 if cmd == 'heartbeat' and data['model'] == 'gateway':
                     gateway.update_key(data['token'])
                 elif cmd == 'report' or cmd == 'heartbeat':
-                    _LOGGER.debug('mcast {1} << {0}'.format(data, cmd))
+                    _LOGGER.debug('MCAST ({1}) << {0}'.format(data, cmd))
                     self.hass.add_job(gateway.push_data, data)
 
                 else:
@@ -372,11 +372,13 @@ class XiaomiDevice(Entity):
 
     def push_data(self, data):
         """Push from Hub"""
-        if self.parse_data(data):
-            self.schedule_update_ha_state()
+        _LOGGER.debug("PUSH >> %s: %s", self, data)
 
         if 'battery' in data:
             self._device_state_attributes[ATTR_BATTERY_LEVEL] = data['battery']
+
+        if self.parse_data(data):
+            self.schedule_update_ha_state()
 
     def parse_data(self, data):
         raise NotImplementedError()
