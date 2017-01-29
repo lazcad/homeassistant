@@ -14,6 +14,13 @@ except ImportError:
 
 _LOGGER = logging.getLogger(__name__)
 
+NO_CLOSE = 'no_close'
+ATTR_OPEN_SINCE = 'Open since'
+
+MOTION = 'motion'
+NO_MOTION = 'no_motion'
+ATTR_NO_MOTION_SINCE = 'No motion since'
+
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
@@ -46,6 +53,7 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         self._state = False
         self._hass = hass
         self._data_key = 'status'
+        self._no_motion_since = 0
         XiaomiDevice.__init__(self, device, 'Motion Sensor', xiaomi_hub)
 
     @property
@@ -57,25 +65,29 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         """Return true if sensor is on."""
         return self._state
 
+    @property
+    def device_state_attributes(self):
+        attrs = {ATTR_NO_MOTION_SINCE: self._no_motion_since}
+        attrs.update(super().device_state_attributes)
+        return attrs
+
     def parse_data(self, data):
-        if 'no_motion' in data:
-            if self._state:
-                self._state = False
-                return True
-            else:
-                return False
+        if NO_MOTION in data:  # handle push from the hub
+            self._no_motion_since = data[NO_MOTION]
+            self._state = False
+            return True
 
         value = data.get(self._data_key)
         if value is None:
             return False
-        if value == 'motion':
-            self._hass.loop.create_task(self.async_poll_status())
+        if value == MOTION:
+            self._no_motion_since = 0
             if self._state:
                 return False
             else:
                 self._state = True
                 return True
-        elif value == 'no_motion':
+        elif value == NO_MOTION:
             if not self._state:
                 return False
             else:
@@ -97,6 +109,7 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
         """Initialize the XiaomiDoorSensor."""
         self._state = False
         self._data_key = 'status'
+        self._open_since = 0
         XiaomiDevice.__init__(self, device, 'Door Window Sensor', xiaomi_hub)
 
     @property
@@ -108,7 +121,17 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
         """Return true if sensor is on."""
         return self._state
 
+    @property
+    def device_state_attributes(self):
+        attrs = {ATTR_OPEN_SINCE: self._open_since}
+        attrs.update(super().device_state_attributes)
+        return attrs
+
     def parse_data(self, data):
+        if NO_CLOSE in data:  # handle push from the hub
+            self._open_since = data[NO_CLOSE]
+            return True
+
         value = data.get(self._data_key)
         if value is None:
             return False
@@ -120,6 +143,7 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
                 self._state = True
                 return True
         elif value == 'close':
+            self._open_since = 0
             if self._state:
                 self._state = False
                 return True
