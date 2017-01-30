@@ -5,53 +5,30 @@ Developed by Rave from Lazcad.com
 """
 import logging
 
-from homeassistant.helpers.entity import Entity
-from homeassistant.components.switch import (SwitchDevice)
+from homeassistant.components.switch import SwitchDevice
+try:
+    from homeassistant.components.xiaomi import XiaomiDevice
+except ImportError:
+    from custom_components.xiaomi import XiaomiDevice
 
 _LOGGER = logging.getLogger(__name__)
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
-
+    devices = []
     XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
-
-    for ip, gateway in XIAOMI_GATEWAYS.items():
+    for (ip, gateway) in XIAOMI_GATEWAYS.items():
         for device in gateway.XIAOMI_DEVICES['switch']:
             model = device['model']
             if (model == 'plug'):
-                add_devices([XiaomiGenericSwitch(device, "Plug", 'status', gateway)])
+                devices.append(XiaomiGenericSwitch(device, "Plug", 'status', gateway))
             elif (model == 'ctrl_neutral1'):
-                add_devices([XiaomiGenericSwitch(device, 'Wall Switch', 'channel_0', gateway)])
+                devices.append(XiaomiGenericSwitch(device, 'Wall Switch', 'channel_0', gateway))
             elif (model == 'ctrl_neutral2'):
-                add_devices([
-                    XiaomiGenericSwitch(device, 'Wall Switch Left','channel_0', gateway),
-                    XiaomiGenericSwitch(device, 'Wall Switch Right', 'channel_1', gateway)])
+                devices.append(XiaomiGenericSwitch(device, 'Wall Switch Left','channel_0', gateway))
+                devices.append(XiaomiGenericSwitch(device, 'Wall Switch Right', 'channel_1', gateway))
+    add_devices(devices)
 
-class XiaomiDevice(Entity):
-    """Representation a base Xiaomi device."""
-
-    def __init__(self, device, name, xiaomi_hub):
-        """Initialize the xiaomi device."""
-        self._sid = device['sid']
-        self._name = '{}_{}'.format(name, self._sid)
-        self.parse_data(device['data'])
-        self.xiaomi_hub = xiaomi_hub
-        xiaomi_hub.XIAOMI_HA_DEVICES[self._sid].append(self)
-
-    @property
-    def name(self):
-        """Return the name of the device."""
-        return self._name
-
-    @property
-    def should_poll(self):
-        return False
-
-    def push_data(self, data):
-        return True
-
-    def parse_data(self, data):
-        return True
 
 class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
     """Representation of a XiaomiPlug."""
@@ -78,38 +55,20 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
         """Turn the switch on."""
         if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'on'):
             self._state = True
-            self.schedule_update_ha_state()
 
     def turn_off(self):
         """Turn the switch off."""
         if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'off'):
             self._state = False
-            self.schedule_update_ha_state()
-
-    def toggle(self):
-        if self._state == False:
-            self.turn_on()
-        else:
-            self.turn_off()
 
     def parse_data(self, data):
-        if self._data_key not in data:
+        value = data.get(self._data_key)
+        if value is None:
             return False
 
-        state = True if data[self._data_key] == 'on' else False
+        state = value == 'on'
         if self._state == state:
             return False
         else:
             self._state = state
             return True
-
-    def push_data(self, data):
-        """Push from Hub"""
-        if self.parse_data(data):
-            self.schedule_update_ha_state()
-
-    def update(self):
-        data = self.xiaomi_hub.get_from_hub(self._sid)
-        if data is None:
-            return
-        self.push_data(data)

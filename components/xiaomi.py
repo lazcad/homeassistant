@@ -13,7 +13,9 @@ import homeassistant.helpers.config_validation as cv
 from threading import Thread
 from collections import defaultdict
 from homeassistant.helpers import discovery
-from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+from homeassistant.helpers.entity import Entity
+from homeassistant.const import ATTR_BATTERY_LEVEL, EVENT_HOMEASSISTANT_STOP
+
 
 REQUIREMENTS = ['pyCrypto']
 
@@ -33,6 +35,7 @@ XIAOMI_COMPONENTS = ['binary_sensor', 'sensor', 'switch', 'light']
 # Shortcut for the logger
 _LOGGER = logging.getLogger(__name__)
 
+
 def setup(hass, config):
     """Set up the Xiaomi component."""
 
@@ -45,7 +48,7 @@ def setup(hass, config):
             _LOGGER.error('Invalid key {0}. Key must be 16 characters'.format(key))
             return False
 
-    comp = XiaomiComponent(hass, gateways, interface);
+    comp = XiaomiComponent(hass, gateways, interface)
 
     trycount = 5
     for _ in range(trycount):
@@ -57,8 +60,8 @@ def setup(hass, config):
         _LOGGER.error("No gateway discovered")
         return False
 
-    if comp.listen():
-        _LOGGER.info("Listening for broadcast")
+    comp.listen()
+    _LOGGER.info("Listening for broadcast")
 
     hass.data['XIAOMI_GATEWAYS'] = comp.XIAOMI_GATEWAYS
 
@@ -73,6 +76,7 @@ def setup(hass, config):
         discovery.load_platform(hass, component, DOMAIN, {}, config)
 
     return True
+
 
 class XiaomiComponent:
 
@@ -121,7 +125,7 @@ class XiaomiComponent:
                     _LOGGER.error("Response must be gateway model")
                     continue
 
-                gatewayKey = '';
+                gatewayKey = ''
                 for gateway in self._gateways_config:
                     sid = gateway['sid']
                     key = gateway['key']
@@ -129,8 +133,7 @@ class XiaomiComponent:
                         gatewayKey = key
 
                 _LOGGER.info('Xiaomi Gateway {0} found at IP {1}'.format(resp["sid"], resp["ip"]))
-                gateway = XiaomiGateway(resp["ip"], resp["port"], resp["sid"], gatewayKey, self._socket)
-                self.XIAOMI_GATEWAYS[resp["ip"]] = gateway
+                self.XIAOMI_GATEWAYS[resp["ip"]] = XiaomiGateway(resp["ip"], resp["port"], resp["sid"], gatewayKey, self._socket)
 
         except socket.timeout:
             _LOGGER.info("Gateway finding finished in 5 seconds")
@@ -155,19 +158,15 @@ class XiaomiComponent:
         return sock
 
     def listen(self):
+        """Start listening."""
 
         _LOGGER.info('Creating Multicast Socket')
         self._mcastsocket = self._create_mcast_socket()
-
-        """Start listening."""
         self._listening = True
-
         t = Thread(target=self._listen_to_msg, args=())
         self._threads.append(t)
         t.daemon = True
         t.start()
-
-        return True
 
     def stop(self):
         """Stop listening."""
@@ -200,38 +199,30 @@ class XiaomiComponent:
 
                 cmd = data['cmd']
                 if cmd == 'heartbeat' and data['model'] == 'gateway':
-                    gateway.GATEWAY_TOKEN = data['token']
+                    gateway.update_key(data['token'])
                 elif cmd == 'report' or cmd == 'heartbeat':
                     _LOGGER.debug('Received data {0}'.format(data))
-                    self.hass.add_job(self._push_data, gateway, data)
+                    self.hass.add_job(gateway.push_data, data)
+
                 else:
                     _LOGGER.error('Unknown multicast data : {0}'.format(data))
             except Exception:
                 _LOGGER.error('Cannot process multicast message : {0}'.format(data))
-                raise
-
-    def _push_data(self, gateway, data):
-        jdata = json.loads(data['data'])
-        if jdata is None:
-            return
-        sid = data['sid']
-        for device in gateway.XIAOMI_HA_DEVICES[sid]:
-            _LOGGER.debug('Received data ({0}): {1}'.format(device.name, jdata))
-            device.push_data(jdata)
+                continue
 
 class XiaomiGateway:
 
-    def __init__(self, ip, port, sid, key, socket):
+    def __init__(self, ip, port, sid, key, sock):
 
         self.GATEWAY_IP = ip
         self.GATEWAY_PORT = int(port)
         self.GATEWAY_SID = sid
         self.GATEWAY_KEY = key
-        self.GATEWAY_TOKEN = None
         self.XIAOMI_DEVICES = defaultdict(list)
         self.XIAOMI_HA_DEVICES = defaultdict(list)
+        self._key = None
 
-        self._socket = socket
+        self._socket = sock
 
         trycount = 5
         for _ in range(trycount):
@@ -243,9 +234,9 @@ class XiaomiGateway:
 
         cmd = '{"cmd" : "get_id_list"}'
         resp = self._send_cmd(cmd, "get_id_list_ack")
-        if resp is None:
+        if resp is None or "token" not in resp or "data" not in resp:
             return False
-        self.GATEWAY_TOKEN = resp["token"]
+        self.update_key(resp["token"])
         sids = json.loads(resp["data"])
         sids.append(self.GATEWAY_SID)
 
@@ -267,13 +258,6 @@ class XiaomiGateway:
                 continue
 
             model = resp["model"]
-
-            xiaomi_device = {
-                "model":model,
-                "sid":resp["sid"],
-                "short_id":resp["short_id"],
-                "data":data}
-
             device_type = None
             if model in sensors:
                 device_type = 'sensor'
@@ -283,11 +267,16 @@ class XiaomiGateway:
                 device_type = 'switch'
             elif model in lights:
                 device_type = 'light'
-
-            if device_type is None:
-                _LOGGER.error('Unsupported devices : {0}'.format(model))
             else:
-                self.XIAOMI_DEVICES[device_type].append(xiaomi_device)
+                _LOGGER.error('Unsupported devices : {0}'.format(model))
+                continue
+
+            xiaomi_device = {
+                "model":model,
+                "sid":resp["sid"],
+                "short_id":resp["short_id"],
+                "data":data}
+            self.XIAOMI_DEVICES[device_type].append(xiaomi_device)
         return True
 
     def _send_cmd(self, cmd, rtnCmd):
@@ -296,53 +285,97 @@ class XiaomiGateway:
             self._socket.sendto(cmd.encode(), (self.GATEWAY_IP, self.GATEWAY_PORT))
             self._socket.settimeout(10.0)
             data, addr = self._socket.recvfrom(1024)
-            if data is None:
-                _LOGGER.error("No response from Gateway")
-                return
-            resp = json.loads(data.decode())
-            if resp['cmd'] == rtnCmd:
-                return resp
-            else:
-                _LOGGER.error("Response does not match return cmd. Got {0}".format(resp['cmd']))
         except socket.timeout:
             _LOGGER.error("Cannot connect to Gateway")
-            return
+            return None
+        if data is None:
+            _LOGGER.error("No response from Gateway")
+            return None
+        resp = json.loads(data.decode())
+        if resp['cmd'] != rtnCmd:
+            _LOGGER.error("Response does not match return cmd. Expected {0}, but got {1}.".format(rtnCmd, resp['cmd']))
+            return None
+        return resp
 
     def write_to_hub(self, sid, data_key, datavalue):
-        key = self._get_key()
         data = {}
         data[data_key] = datavalue
-        data['key'] = key
+        if self._key is None:
+            return False
+        data['key'] = self._key
         cmd = {}
         cmd['cmd'] = 'write'
         cmd['sid'] = sid
         cmd['data'] = data
         cmd = json.dumps(cmd)
         resp = self._send_cmd(cmd, "write_ack")
-        if resp is None or 'data' not in resp:
-            return False
-        data = resp['data']
-        if 'error' in data:
-            _LOGGER.error('Invalid Key')
-            return False
-
-        return True
+        return self._validate_data(resp)
 
     def get_from_hub(self, sid):
         cmd = '{ "cmd":"read","sid":"' + sid + '"}'
         resp = self._send_cmd(cmd, "read_ack")
-        if resp is None or "data" not in resp:
-            _LOGGER.error('No data in response from hub {0}'.format(resp))
-            return
-        data = resp["data"]
-        try:
-            return json.loads(resp["data"])
-        except Exception:
-            _LOGGER.error('Cannot process message got from hub : {0}'.format(data))
+        return self.push_data(resp)
 
-    def _get_key(self):
+    def push_data(self, data):
+        if not self._validate_data(data):
+            return False
+        jdata = json.loads(data['data'])
+        if jdata is None:
+            return False
+        sid = data['sid']
+        for device in self.XIAOMI_HA_DEVICES[sid]:
+            device.push_data(jdata)
+        return True
+
+    def update_key(self, token):
         from Crypto.Cipher import AES
         IV = bytes(bytearray.fromhex('17996d093d28ddb3ba695a2e6f58562e'))
         encryptor = AES.new(self.GATEWAY_KEY, AES.MODE_CBC, IV=IV)
-        ciphertext = encryptor.encrypt(self.GATEWAY_TOKEN)
-        return ''.join('{:02x}'.format(x) for x in ciphertext)
+        ciphertext = encryptor.encrypt(token)
+        self._key = ''.join('{:02x}'.format(x) for x in ciphertext)
+
+    def _validate_data(self, data):
+        if data is None or "data" not in data:
+            _LOGGER.error('No data in response from hub {0}'.format(data))
+            return False
+        if 'error' in data['data']:
+            _LOGGER.error('Invalid Key, {0}'.format(data))
+            return False
+        return True
+
+class XiaomiDevice(Entity):
+    """Representation a base Xiaomi device."""
+
+    def __init__(self, device, name, xiaomi_hub):
+        """Initialize the xiaomi device."""
+        self._sid = device['sid']
+        self._name = '{}_{}'.format(name, self._sid)
+        self.parse_data(device['data'])
+        self.xiaomi_hub = xiaomi_hub
+        self._device_state_attributes = {}
+        xiaomi_hub.XIAOMI_HA_DEVICES[self._sid].append(self)
+
+    @property
+    def name(self):
+        """Return the name of the device."""
+        return self._name
+
+    @property
+    def should_poll(self):
+        return False
+
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes."""
+        return self._device_state_attributes
+
+    def push_data(self, data):
+        """Push from Hub"""
+        if self.parse_data(data):
+            self.schedule_update_ha_state()
+
+        if 'battery' in data:
+            self._device_state_attributes[ATTR_BATTERY_LEVEL] = data['battery']
+
+    def parse_data(self, data):
+        raise NotImplementedError()
