@@ -131,7 +131,8 @@ class XiaomiComponent:
                     key = gateway['key']
                     if sid is None or sid == resp["sid"]:
                         gatewayKey = key
-
+                if len(key) != 16:
+                    continue
                 _LOGGER.info('Xiaomi Gateway {0} found at IP {1}'.format(resp["sid"], resp["ip"]))
                 self.XIAOMI_GATEWAYS[resp["ip"]] = XiaomiGateway(resp["ip"], resp["port"], resp["sid"], gatewayKey, self._socket)
 
