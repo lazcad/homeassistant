@@ -53,7 +53,7 @@ def setup(hass, config):
     trycount = 5
     for _ in range(trycount):
         comp.discoverGateways()
-        if len(comp.XIAOMI_GATEWAYS) > 0:
+        if len(comp.XIAOMI_GATEWAYS) >= len(gateways):
             break
 
     if len(comp.XIAOMI_GATEWAYS) == 0:
