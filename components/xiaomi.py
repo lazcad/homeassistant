@@ -53,7 +53,7 @@ def setup(hass, config):
     trycount = 5
     for _ in range(trycount):
         comp.discoverGateways()
-        if len(comp.XIAOMI_GATEWAYS) > 0:
+        if len(comp.XIAOMI_GATEWAYS) >= len(gateways):
             break
 
     if len(comp.XIAOMI_GATEWAYS) == 0:
@@ -131,8 +131,12 @@ class XiaomiComponent:
                     key = gateway['key']
                     if sid is None or sid == resp["sid"]:
                         gatewayKey = key
-
+                if len(key) != 16:
+                    _LOGGER.error('Unknown Xiaomi Gateway {0} found at IP {1}'.format(resp["sid"], resp["ip"]))
+                    continue
                 _LOGGER.info('Xiaomi Gateway {0} found at IP {1}'.format(resp["sid"], resp["ip"]))
+                if resp["ip"] in self.XIAOMI_GATEWAYS:
+                    continue
                 self.XIAOMI_GATEWAYS[resp["ip"]] = XiaomiGateway(resp["ip"], resp["port"], resp["sid"], gatewayKey, self._socket)
 
         except socket.timeout:
