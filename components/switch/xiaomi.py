@@ -55,11 +55,13 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
         """Turn the switch on."""
         if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'on'):
             self._state = True
+            self.schedule_update_ha_state()
 
     def turn_off(self):
         """Turn the switch off."""
         if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'off'):
             self._state = False
+            self.schedule_update_ha_state()
 
     def parse_data(self, data):
         value = data.get(self._data_key)
