@@ -53,9 +53,15 @@ Installation (Raspberry Pi)
        key: xxxxxxxxxxxxxxxx
   ```
 
+   One Gateway (No Plug / No Gateway Light / No Aqara)
+  ```yaml
+ #you can leave out everything if you don't need to control the gateway. Useful if you only need to use Xiaomi Sensors
+ xiaomi:
+  ```
+
  Multiple Gateway
   ```yaml
- #12 characters sid can be obtained from the gateway's MAC address.
+ #12 characters sid can be obtained from the gateway's MAC address (in lowercase without semicolon).
  xiaomi:
    gateways:
      - sid: xxxxxxxxxxxx
@@ -144,7 +150,7 @@ Installation (Raspberry Pi)
           action_type: flip90
  ```
 
-7. Important! Only use this if you have have issue with Socket binding or multicast. Using this when you have no problem with socket or mcast will introduce other issues. Add the IP address of the network interface to the config
+Important! Only use this if you have have issue with Socket binding or multicast. Using this when you have no problem with socket or mcast will introduce other issues. Add the IP address of the network interface to the config
  
  ```yaml
  xiaomi:
@@ -154,4 +160,14 @@ Installation (Raspberry Pi)
      - sid: xxxxxxxxxxxx
        key: xxxxxxxxxxxxxxxx
     interface: xx.xx.xx.xx
+ ```
+
+Other options
+ ```yaml
+ xiaomi:
+   gateways:
+     - sid: xxxxxxxxxxxx
+       key: xxxxxxxxxxxxxxxx
+    interface: xx.xx.xx.xx
+    poll_motion: True # True (Default) or False. If False, motion sensor will be deactivated in 2 minutes. Turn on polling will shorten the time to 1 minute
  ```

@@ -7,25 +7,25 @@ import logging
 
 from homeassistant.components.switch import SwitchDevice
 try:
-    from homeassistant.components.xiaomi import XiaomiDevice
+    from homeassistant.components.xiaomi import (PY_XIAOMI_GATEWAY, XiaomiDevice)
 except ImportError:
-    from custom_components.xiaomi import XiaomiDevice
+    from custom_components.xiaomi import (PY_XIAOMI_GATEWAY, XiaomiDevice)
 
 _LOGGER = logging.getLogger(__name__)
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
     devices = []
-    XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
-    for (ip, gateway) in XIAOMI_GATEWAYS.items():
-        for device in gateway.XIAOMI_DEVICES['switch']:
+    gateways = PY_XIAOMI_GATEWAY.gateways
+    for (ip_add, gateway) in gateways.items():
+        for device in gateway.devices['switch']:
             model = device['model']
-            if (model == 'plug'):
+            if model == 'plug':
                 devices.append(XiaomiGenericSwitch(device, "Plug", 'status', gateway))
-            elif (model == 'ctrl_neutral1'):
+            elif model == 'ctrl_neutral1':
                 devices.append(XiaomiGenericSwitch(device, 'Wall Switch', 'channel_0', gateway))
-            elif (model == 'ctrl_neutral2'):
-                devices.append(XiaomiGenericSwitch(device, 'Wall Switch Left','channel_0', gateway))
+            elif model == 'ctrl_neutral2':
+                devices.append(XiaomiGenericSwitch(device, 'Wall Switch Left', 'channel_0', gateway))
                 devices.append(XiaomiGenericSwitch(device, 'Wall Switch Right', 'channel_1', gateway))
     add_devices(devices)
 
@@ -41,6 +41,7 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
 
     @property
     def icon(self):
+        """Return the icon to use in the frontend, if any."""
         if self._data_key == 'status':
             return 'mdi:power-plug'
         else:
@@ -64,6 +65,7 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
             self.schedule_update_ha_state()
 
     def parse_data(self, data):
+        """Parse data sent by gateway"""
         value = data.get(self._data_key)
         if value is None:
             return False

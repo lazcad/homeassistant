@@ -22,15 +22,21 @@ REQUIREMENTS = ['pyCrypto']
 DOMAIN = 'xiaomi'
 CONF_GATEWAYS = 'gateways'
 CONF_INTERFACE = 'interface'
+CONF_POLL_MOTION = 'poll_motion'
+
+DEFAULT_KEY = "xxxxxxxxxxxxxxxx"
 
 CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
-        vol.Required(CONF_GATEWAYS): cv.ensure_list,
-        vol.Optional(CONF_INTERFACE, default='any'): cv.string
+        vol.Optional(CONF_GATEWAYS, default=[{"sid": None, "key": DEFAULT_KEY}]): cv.ensure_list,
+        vol.Optional(CONF_INTERFACE, default='any'): cv.string,
+        vol.Optional(CONF_POLL_MOTION, default=True): cv.boolean
     })
 }, extra=vol.ALLOW_EXTRA)
 
 XIAOMI_COMPONENTS = ['binary_sensor', 'sensor', 'switch', 'light']
+PY_XIAOMI_GATEWAY = None
+POLL_MOTION = True
 
 # Shortcut for the logger
 _LOGGER = logging.getLogger(__name__)
@@ -42,33 +48,43 @@ def setup(hass, config):
     gateways = config[DOMAIN][CONF_GATEWAYS]
     interface = config[DOMAIN][CONF_INTERFACE]
 
+    global POLL_MOTION
+    POLL_MOTION = config[DOMAIN][CONF_POLL_MOTION]
+
     for gateway in gateways:
-        key = gateway['key']
-        if len(key) != 16:
-            _LOGGER.error('Invalid key {0}. Key must be 16 characters'.format(key))
+        sid = gateway['sid']
+        if sid != None and len(sid) != 12:
+            _LOGGER.error('Invalid gateway sid %s. It must be 12 characters in lowercase without semicolon', sid)
             return False
 
-    comp = XiaomiComponent(hass, gateways, interface)
+        key = gateway['key']
+        if key == DEFAULT_KEY:
+            _LOGGER.warning('Gateway Key is not provided. Controlling gateway device will not be possible.')
+
+        if len(key) != 16:
+            _LOGGER.error('Invalid key %s. Key must be 16 characters', key)
+            return False
+
+    global PY_XIAOMI_GATEWAY
+    PY_XIAOMI_GATEWAY = PyXiaomiGateway(hass, gateways, interface)
 
     trycount = 5
     for _ in range(trycount):
-        comp.discoverGateways()
-        if len(comp.XIAOMI_GATEWAYS) >= len(gateways):
+        PY_XIAOMI_GATEWAY.discover_gateways()
+        if len(PY_XIAOMI_GATEWAY.gateways) > 0:
             break
 
-    if len(comp.XIAOMI_GATEWAYS) == 0:
+    if len(PY_XIAOMI_GATEWAY.gateways) == 0:
         _LOGGER.error("No gateway discovered")
         return False
 
-    comp.listen()
+    PY_XIAOMI_GATEWAY.listen()
     _LOGGER.info("Listening for broadcast")
 
-    hass.data['XIAOMI_GATEWAYS'] = comp.XIAOMI_GATEWAYS
-
     def stop_xiaomi(event):
+        """Stop Xiaomi Socket."""
         _LOGGER.info("Shutting down Xiaomi Hub.")
-        comp.stop()
-        del hass.data['XIAOMI_GATEWAYS']
+        PY_XIAOMI_GATEWAY.stop_listen()
 
     hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, stop_xiaomi)
 
@@ -78,14 +94,14 @@ def setup(hass, config):
     return True
 
 
-class XiaomiComponent:
-
+class PyXiaomiGateway:
+    """PyXiami."""
     MULTICAST_ADDRESS = '224.0.0.50'
     MULTICAST_PORT = 9898
     GATEWAY_DISCOVERY_PORT = 4321
     SOCKET_BUFSIZE = 1024
 
-    XIAOMI_GATEWAYS = defaultdict(list)
+    gateways = defaultdict(list)
 
     def __init__(self, hass, gateways_config, interface):
 
@@ -101,14 +117,18 @@ class XiaomiComponent:
         self._gateways_config = gateways_config
         self._interface = interface
 
-    def discoverGateways(self):
+    def discover_gateways(self):
+        """Discover gateways using multicast"""
+
         _socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         if self._interface != 'any':
             _socket.bind((self._interface, 0))
 
         try:
             _LOGGER.info('Discovering Xiaomi Gateways')
-            _socket.sendto('{"cmd":"whois"}'.encode(), (self.MULTICAST_ADDRESS, self.GATEWAY_DISCOVERY_PORT))
+            _socket.sendto('{"cmd":"whois"}'.encode(),
+                           (self.MULTICAST_ADDRESS, self.GATEWAY_DISCOVERY_PORT))
+
             _socket.settimeout(5.0)
 
             while True:
@@ -125,19 +145,19 @@ class XiaomiComponent:
                     _LOGGER.error("Response must be gateway model")
                     continue
 
-                gatewayKey = ''
+                gateway_key = ''
                 for gateway in self._gateways_config:
                     sid = gateway['sid']
                     key = gateway['key']
                     if sid is None or sid == resp["sid"]:
-                        gatewayKey = key
-                if len(key) != 16:
-                    _LOGGER.error('Unknown Xiaomi Gateway {0} found at IP {1}'.format(resp["sid"], resp["ip"]))
-                    continue
-                _LOGGER.info('Xiaomi Gateway {0} found at IP {1}'.format(resp["sid"], resp["ip"]))
-                if resp["ip"] in self.XIAOMI_GATEWAYS:
-                    continue
-                self.XIAOMI_GATEWAYS[resp["ip"]] = XiaomiGateway(resp["ip"], resp["port"], resp["sid"], gatewayKey, self._socket)
+                        gateway_key = key
+
+                ip_add = resp["ip"]
+                sid = resp["sid"]
+                port = resp["port"]
+
+                _LOGGER.info('Xiaomi Gateway %s found at IP %s', sid, ip_add)
+                self.gateways[ip_add] = XiaomiGateway(ip_add, port, sid, gateway_key, self._socket)
 
         except socket.timeout:
             _LOGGER.info("Gateway finding finished in 5 seconds")
@@ -167,12 +187,12 @@ class XiaomiComponent:
         _LOGGER.info('Creating Multicast Socket')
         self._mcastsocket = self._create_mcast_socket()
         self._listening = True
-        t = Thread(target=self._listen_to_msg, args=())
-        self._threads.append(t)
-        t.daemon = True
-        t.start()
+        thread = Thread(target=self._listen_to_msg, args=())
+        self._threads.append(thread)
+        thread.daemon = True
+        thread.start()
 
-    def stop(self):
+    def stop_listen(self):
         """Stop listening."""
         self._listening = False
 
@@ -186,44 +206,45 @@ class XiaomiComponent:
             self._mcastsocket.close()
             self._mcastsocket = None
 
-        for t in self._threads:
-            t.join()
+        for thread in self._threads:
+            thread.join()
 
     def _listen_to_msg(self):
         while self._listening:
             if self._mcastsocket is None:
                 continue
-            data, (ip, port) = self._mcastsocket.recvfrom(self.SOCKET_BUFSIZE)
+            data, (ip_add, port) = self._mcastsocket.recvfrom(self.SOCKET_BUFSIZE)
             try:
                 data = json.loads(data.decode("ascii"))
-                gateway = self.XIAOMI_GATEWAYS.get(ip)
+                gateway = self.gateways.get(ip_add)
                 if gateway is None:
-                    _LOGGER.error('Unknown gateway ip {0}'.format(ip))
+                    _LOGGER.error('Unknown gateway ip %s', ip_add)
                     continue
 
                 cmd = data['cmd']
                 if cmd == 'heartbeat' and data['model'] == 'gateway':
                     gateway.update_key(data['token'])
                 elif cmd == 'report' or cmd == 'heartbeat':
-                    _LOGGER.debug('MCAST ({1}) << {0}'.format(data, cmd))
+                    _LOGGER.debug('MCAST (%s) << %s', cmd, data)
                     self.hass.add_job(gateway.push_data, data)
 
                 else:
-                    _LOGGER.error('Unknown multicast data : {0}'.format(data))
+                    _LOGGER.error('Unknown multicast data : %s', data)
             except Exception:
-                _LOGGER.error('Cannot process multicast message : {0}'.format(data))
+                _LOGGER.error('Cannot process multicast message : %s', data)
                 continue
 
 class XiaomiGateway:
+    """Xiaomi Gateway Component"""
 
     def __init__(self, ip, port, sid, key, sock):
 
-        self.GATEWAY_IP = ip
-        self.GATEWAY_PORT = int(port)
-        self.GATEWAY_SID = sid
-        self.GATEWAY_KEY = key
-        self.XIAOMI_DEVICES = defaultdict(list)
-        self.XIAOMI_HA_DEVICES = defaultdict(list)
+        self.ip_add = ip
+        self.port = int(port)
+        self.sid = sid
+        self.key = key
+        self.devices = defaultdict(list)
+        self.ha_devices = defaultdict(list)
         self._key = None
 
         self._socket = sock
@@ -242,9 +263,9 @@ class XiaomiGateway:
             return False
         self.update_key(resp["token"])
         sids = json.loads(resp["data"])
-        sids.append(self.GATEWAY_SID)
+        sids.append(self.sid)
 
-        _LOGGER.info('Found {0} devices'.format(len(sids)))
+        _LOGGER.info('Found %s devices', len(sids))
 
         sensors = ['sensor_ht']
         binary_sensors = ['magnet', 'motion', 'switch', '86sw1', '86sw2', 'cube']
@@ -272,7 +293,7 @@ class XiaomiGateway:
             elif model in lights:
                 device_type = 'light'
             else:
-                _LOGGER.error('Unsupported devices : {0}'.format(model))
+                _LOGGER.error('Unsupported devices : %s', model)
                 continue
 
             xiaomi_device = {
@@ -280,14 +301,14 @@ class XiaomiGateway:
                 "sid":resp["sid"],
                 "short_id":resp["short_id"],
                 "data":data}
-            self.XIAOMI_DEVICES[device_type].append(xiaomi_device)
+            self.devices[device_type].append(xiaomi_device)
         return True
 
-    def _send_cmd(self, cmd, rtnCmd):
+    def _send_cmd(self, cmd, rtn_cmd):
         try:
             self._socket.settimeout(10.0)
             _LOGGER.debug(">> %s", cmd.encode())
-            self._socket.sendto(cmd.encode(), (self.GATEWAY_IP, self.GATEWAY_PORT))
+            self._socket.sendto(cmd.encode(), (self.ip_add, self.port))
             data, addr = self._socket.recvfrom(1024)
         except socket.timeout:
             _LOGGER.error("Cannot connect to Gateway")
@@ -297,12 +318,13 @@ class XiaomiGateway:
             return None
         resp = json.loads(data.decode())
         _LOGGER.debug("<< %s", resp)
-        if resp['cmd'] != rtnCmd:
-            _LOGGER.error("Response does not match return cmd. Expected {0}, but got {1}.".format(rtnCmd, resp['cmd']))
+        if resp['cmd'] != rtn_cmd:
+            _LOGGER.error("Non matching response. Expecting %s, but got %s", rtn_cmd, resp['cmd'])
             return None
         return resp
 
     def write_to_hub(self, sid, data_key, datavalue):
+        """Send data to gateway to turn on / off device"""
         data = {}
         data[data_key] = datavalue
         if self._key is None:
@@ -317,34 +339,37 @@ class XiaomiGateway:
         return self._validate_data(resp)
 
     def get_from_hub(self, sid):
+        """Get data from gateway"""
         cmd = '{ "cmd":"read","sid":"' + sid + '"}'
         resp = self._send_cmd(cmd, "read_ack")
         return self.push_data(resp)
 
     def push_data(self, data):
+        """Push data broadcasted from gateway to device"""
         if not self._validate_data(data):
             return False
         jdata = json.loads(data['data'])
         if jdata is None:
             return False
         sid = data['sid']
-        for device in self.XIAOMI_HA_DEVICES[sid]:
+        for device in self.ha_devices[sid]:
             device.push_data(jdata)
         return True
 
     def update_key(self, token):
+        """Update key using token from gateway"""
         from Crypto.Cipher import AES
-        IV = bytes(bytearray.fromhex('17996d093d28ddb3ba695a2e6f58562e'))
-        encryptor = AES.new(self.GATEWAY_KEY, AES.MODE_CBC, IV=IV)
+        init_vector = bytes(bytearray.fromhex('17996d093d28ddb3ba695a2e6f58562e'))
+        encryptor = AES.new(self.key, AES.MODE_CBC, IV=init_vector)
         ciphertext = encryptor.encrypt(token)
         self._key = ''.join('{:02x}'.format(x) for x in ciphertext)
 
     def _validate_data(self, data):
         if data is None or "data" not in data:
-            _LOGGER.error('No data in response from hub {0}'.format(data))
+            _LOGGER.error('No data in response from hub %s', data)
             return False
         if 'error' in data['data']:
-            _LOGGER.error('Got error element in data {0}'.format(data))
+            _LOGGER.error('Got error element in data %s', data['data'])
             return False
         return True
 
@@ -358,7 +383,7 @@ class XiaomiDevice(Entity):
         self.parse_data(device['data'])
         self.xiaomi_hub = xiaomi_hub
         self._device_state_attributes = {}
-        xiaomi_hub.XIAOMI_HA_DEVICES[self._sid].append(self)
+        xiaomi_hub.ha_devices[self._sid].append(self)
 
     @property
     def name(self):
@@ -367,6 +392,7 @@ class XiaomiDevice(Entity):
 
     @property
     def should_poll(self):
+        """Poll update device status"""
         return False
 
     @property
@@ -385,4 +411,5 @@ class XiaomiDevice(Entity):
             self.schedule_update_ha_state()
 
     def parse_data(self, data):
+        """Parse data sent by gateway"""
         raise NotImplementedError()

@@ -8,9 +8,9 @@ import asyncio
 
 from homeassistant.components.binary_sensor import BinarySensorDevice
 try:
-    from homeassistant.components.xiaomi import XiaomiDevice
+    from homeassistant.components.xiaomi import (PY_XIAOMI_GATEWAY, XiaomiDevice, POLL_MOTION)
 except ImportError:
-    from custom_components.xiaomi import XiaomiDevice
+    from custom_components.xiaomi import (PY_XIAOMI_GATEWAY, XiaomiDevice, POLL_MOTION)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,22 +25,23 @@ ATTR_NO_MOTION_SINCE = 'No motion since'
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
     devices = []
-    XIAOMI_GATEWAYS = hass.data['XIAOMI_GATEWAYS']
-    for (ip, gateway) in XIAOMI_GATEWAYS.items():
-        for device in gateway.XIAOMI_DEVICES['binary_sensor']:
+    gateways = PY_XIAOMI_GATEWAY.gateways
+
+    for (ip_add, gateway) in gateways.items():
+        for device in gateway.devices['binary_sensor']:
             model = device['model']
-            if (model == 'motion'):
+            if model == 'motion':
                 devices.append(XiaomiMotionSensor(device, hass, gateway))
-            elif (model == 'magnet'):
+            elif model == 'magnet':
                 devices.append(XiaomiDoorSensor(device, gateway))
-            elif (model == 'switch'):
+            elif model == 'switch':
                 devices.append(XiaomiButton(device, 'Switch', 'status', hass, gateway))
-            elif (model == '86sw1'):
+            elif model == '86sw1':
                 devices.append(XiaomiButton(device, 'Wall Switch', 'channel_0', hass, gateway))
-            elif (model == '86sw2'):
+            elif model == '86sw2':
                 devices.append(XiaomiButton(device, 'Wall Switch (Left)', 'channel_0', hass, gateway))
                 devices.append(XiaomiButton(device, 'Wall Switch (Right)', 'channel_1', hass, gateway))
-            elif (model == 'cube'):
+            elif model == 'cube':
                 devices.append(XiaomiCube(device, hass, gateway))
     add_devices(devices)
 
@@ -58,6 +59,7 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
 
     @property
     def sensor_class(self):
+        """Return the class of binary sensor."""
         return 'motion'
 
     @property
@@ -67,11 +69,13 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
 
     @property
     def device_state_attributes(self):
+        """Return the state attributes."""
         attrs = {ATTR_NO_MOTION_SINCE: self._no_motion_since}
         attrs.update(super().device_state_attributes)
         return attrs
 
     def parse_data(self, data):
+        """Parse data sent by gateway"""
         if NO_MOTION in data:  # handle push from the hub
             self._no_motion_since = data[NO_MOTION]
             self._state = False
@@ -80,12 +84,19 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         value = data.get(self._data_key)
         if value is None:
             return False
+
         if value == MOTION:
+            self._hass.bus.fire('motion', {
+                'entity_id': self.entity_id
+            })
+
             self._no_motion_since = 0
             if self._state:
                 return False
             else:
                 self._state = True
+                if POLL_MOTION:
+                    self._hass.loop.create_task(self._async_poll_status())
                 return True
         elif value == NO_MOTION:
             if not self._state:
@@ -94,13 +105,16 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
                 self._state = False
                 return True
 
-    @asyncio.coroutine
-    def async_poll_status(self):
-        yield from asyncio.sleep(10)
-        if not self.xiaomi_hub.get_from_hub(self._sid) and self._state:
-            self._state = False
+    def push_data(self, data):
+        """Push from Hub"""
+        if self.parse_data(data):
             self.schedule_update_ha_state()
 
+    @asyncio.coroutine
+    def _async_poll_status(self):
+        while self._state:
+            yield from asyncio.sleep(10)
+            self.xiaomi_hub.get_from_hub(self._sid)
 
 class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
     """Representation of a XiaomiDoorSensor."""
@@ -114,6 +128,7 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
 
     @property
     def sensor_class(self):
+        """Return the class of binary sensor."""
         return 'opening'
 
     @property
@@ -123,11 +138,13 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
 
     @property
     def device_state_attributes(self):
+        """Return the state attributes."""
         attrs = {ATTR_OPEN_SINCE: self._open_since}
         attrs.update(super().device_state_attributes)
         return attrs
 
     def parse_data(self, data):
+        """Parse data sent by gateway"""
         if NO_CLOSE in data:  # handle push from the hub
             self._open_since = data[NO_CLOSE]
             return True
@@ -152,6 +169,7 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
 
 
 class XiaomiButton(XiaomiDevice, BinarySensorDevice):
+    """Representation of a Xiaomi Button."""
 
     def __init__(self, device, name, data_key, hass, xiaomi_hub):
         """Initialize the XiaomiButton."""
@@ -166,6 +184,7 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
         return self._is_down
 
     def parse_data(self, data):
+        """Parse data sent by gateway"""
         value = data.get(self._data_key)
         if value is None:
             return False
@@ -191,6 +210,7 @@ class XiaomiButton(XiaomiDevice, BinarySensorDevice):
 
 
 class XiaomiCube(XiaomiDevice, BinarySensorDevice):
+    """Representation of a Xiaomi Cube."""
 
     STATUS = 'status'
     ROTATE = 'rotate'
@@ -206,7 +226,7 @@ class XiaomiCube(XiaomiDevice, BinarySensorDevice):
         return False
 
     def parse_data(self, data):
-        """Push from Hub"""
+        """Parse data sent by gateway"""
         if self.STATUS in data:
             self._hass.bus.fire('cube_action', {
                 'entity_id': self.entity_id,
@@ -217,7 +237,7 @@ class XiaomiCube(XiaomiDevice, BinarySensorDevice):
             self._hass.bus.fire('cube_action', {
                 'entity_id': self.entity_id,
                 'action_type': self.ROTATE,
-                'action_value': float(data[self.ROTATE].replace(",","."))
+                'action_value': float(data[self.ROTATE].replace(",", "."))
             })
 
         return False
