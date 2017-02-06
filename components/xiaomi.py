@@ -23,6 +23,7 @@ DOMAIN = 'xiaomi'
 CONF_GATEWAYS = 'gateways'
 CONF_INTERFACE = 'interface'
 CONF_POLL_MOTION = 'poll_motion'
+CONF_DISCOVERY_RETRY = 'discovery_retry'
 
 DEFAULT_KEY = "xxxxxxxxxxxxxxxx"
 
@@ -30,7 +31,8 @@ CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
         vol.Optional(CONF_GATEWAYS, default=[{"sid": None, "key": DEFAULT_KEY}]): cv.ensure_list,
         vol.Optional(CONF_INTERFACE, default='any'): cv.string,
-        vol.Optional(CONF_POLL_MOTION, default=True): cv.boolean
+        vol.Optional(CONF_POLL_MOTION, default=True): cv.boolean,
+        vol.Optional(CONF_DISCOVERY_RETRY, default=3): cv.positive_int
     })
 }, extra=vol.ALLOW_EXTRA)
 
@@ -47,15 +49,16 @@ def setup(hass, config):
 
     gateways = config[DOMAIN][CONF_GATEWAYS]
     interface = config[DOMAIN][CONF_INTERFACE]
+    discovery_retry = config[DOMAIN][CONF_DISCOVERY_RETRY]
 
     global POLL_MOTION
     POLL_MOTION = config[DOMAIN][CONF_POLL_MOTION]
 
     for gateway in gateways:
         sid = gateway['sid']
-        if sid != None and len(sid) != 12:
-            _LOGGER.error('Invalid gateway sid %s. It must be 12 characters in lowercase without semicolon', sid)
-            return False
+
+        if sid != None:
+            gateway['sid'] = gateway['sid'].replace(":", "").lower()
 
         key = gateway['key']
         if key == DEFAULT_KEY:
@@ -68,8 +71,9 @@ def setup(hass, config):
     global PY_XIAOMI_GATEWAY
     PY_XIAOMI_GATEWAY = PyXiaomiGateway(hass, gateways, interface)
 
-    trycount = 5
-    for _ in range(trycount):
+    _LOGGER.info("Expecting %s gateways", len(gateways))
+    for _ in range(discovery_retry):
+        _LOGGER.info('Discovering Xiaomi Gateways (Try %s)', _ + 1)
         PY_XIAOMI_GATEWAY.discover_gateways()
         if len(PY_XIAOMI_GATEWAY.gateways) >= len(gateways):
             break
@@ -125,7 +129,6 @@ class PyXiaomiGateway:
             _socket.bind((self._interface, 0))
 
         try:
-            _LOGGER.info('Discovering Xiaomi Gateways')
             _socket.sendto('{"cmd":"whois"}'.encode(),
                            (self.MULTICAST_ADDRESS, self.GATEWAY_DISCOVERY_PORT))
 
@@ -145,6 +148,10 @@ class PyXiaomiGateway:
                     _LOGGER.error("Response must be gateway model")
                     continue
 
+                ip_add = resp["ip"]
+                if ip_add in self.gateways:
+                    continue
+
                 gateway_key = ''
                 for gateway in self._gateways_config:
                     sid = gateway['sid']
@@ -152,13 +159,11 @@ class PyXiaomiGateway:
                     if sid is None or sid == resp["sid"]:
                         gateway_key = key
 
-                ip_add = resp["ip"]
                 sid = resp["sid"]
                 port = resp["port"]
 
                 _LOGGER.info('Xiaomi Gateway %s found at IP %s', sid, ip_add)
-                if ip_add in self.gateways:
-                    continue
+
                 self.gateways[ip_add] = XiaomiGateway(ip_add, port, sid, gateway_key, self._socket)
 
         except socket.timeout:

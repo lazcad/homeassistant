@@ -55,6 +55,7 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         self._hass = hass
         self._data_key = 'status'
         self._no_motion_since = 0
+        self._is_firing_motion = False
         XiaomiDevice.__init__(self, device, 'Motion Sensor', xiaomi_hub)
 
     @property
@@ -86,9 +87,9 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
             return False
 
         if value == MOTION:
-            self._hass.bus.fire('motion', {
-                'entity_id': self.entity_id
-            })
+            if not self._is_firing_motion:
+                self._is_firing_motion = True
+                self._hass.loop.create_task(self._async_delay_fire_motion())
 
             self._no_motion_since = 0
             if self._state:
@@ -105,10 +106,14 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
                 self._state = False
                 return True
 
-    def push_data(self, data):
-        """Push from Hub"""
-        if self.parse_data(data):
-            self.schedule_update_ha_state()
+    @asyncio.coroutine
+    def _async_delay_fire_motion(self):
+        self._hass.bus.fire('motion', {
+            'entity_id': self.entity_id
+        })
+
+        yield from asyncio.sleep(1)
+        self._is_firing_motion = False
 
     @asyncio.coroutine
     def _async_poll_status(self):
