@@ -71,7 +71,7 @@ def setup(hass, config):
     trycount = 5
     for _ in range(trycount):
         PY_XIAOMI_GATEWAY.discover_gateways()
-        if len(PY_XIAOMI_GATEWAY.gateways) > 0:
+        if len(PY_XIAOMI_GATEWAY.gateways) >= len(gateways):
             break
 
     if len(PY_XIAOMI_GATEWAY.gateways) == 0:
