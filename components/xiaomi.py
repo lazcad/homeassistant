@@ -157,6 +157,8 @@ class PyXiaomiGateway:
                 port = resp["port"]
 
                 _LOGGER.info('Xiaomi Gateway %s found at IP %s', sid, ip_add)
+                if ip_add in self.gateways:
+                    continue
                 self.gateways[ip_add] = XiaomiGateway(ip_add, port, sid, gateway_key, self._socket)
 
         except socket.timeout:
