@@ -117,7 +117,6 @@ Installation (Raspberry Pi)
       event_type: motion_action
       event_data:
           entity_id: binary_sensor.motion_sensor_158d000xxxxxc2
-          action_type: motion #motion / no_motion
   ```
   
   ```yaml
@@ -139,15 +138,6 @@ Installation (Raspberry Pi)
           action_type: open # open / close / no_close
   ```
 
-  ```yaml
-   #trigger for Motion Sensor using Event
-	
-    trigger:
-      platform: event
-      event_type: motion
-      event_data:
-          entity_id: binary_sensor.motion_sensor_158d000xxxxxc2
-  ```
   
 6. For Cube, use the following trigger. Available actions are flip90, flip180, move, tap_twice, shake_air, swing, alert, free_fall and rotate
 
