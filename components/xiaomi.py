@@ -367,8 +367,8 @@ class XiaomiGateway:
         """Update key using token from gateway"""
         from Crypto.Cipher import AES
         init_vector = bytes(bytearray.fromhex('17996d093d28ddb3ba695a2e6f58562e'))
-        encryptor = AES.new(self.key, AES.MODE_CBC, IV=init_vector)
-        ciphertext = encryptor.encrypt(token)
+        encryptor = AES.new(self.key.encode(), AES.MODE_CBC, IV=init_vector)
+        ciphertext = encryptor.encrypt(token.encode())
         self._key = ''.join('{:02x}'.format(x) for x in ciphertext)
 
     def _validate_data(self, data):
