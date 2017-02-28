@@ -17,7 +17,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.const import ATTR_BATTERY_LEVEL, EVENT_HOMEASSISTANT_STOP
 
 
-REQUIREMENTS = ['pyCrypto']
+REQUIREMENTS = ['pyCrypto==2.6.1']
 
 DOMAIN = 'xiaomi'
 CONF_GATEWAYS = 'gateways'
