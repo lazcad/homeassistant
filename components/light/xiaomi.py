@@ -51,15 +51,19 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
 
         if value == 0:
             if self._state:
-                return False
-            else:
                 self._state = False
                 return True
+            else:
+                return False
 
         rgbhexstr = "%x" % value
         if len(rgbhexstr) == 7:
             # fromhex can't deal with odd strings
             rgbhexstr = '0' + rgbhexstr
+
+        if len(rgbhexstr) != 8:
+            _LOGGER.error('Light RGB data error. Must be 8 characters. Received: %s', rgbhexstr)
+            return False
 
         rgbhex = bytes.fromhex(rgbhexstr)
         rgba = struct.unpack('BBBB', rgbhex)
