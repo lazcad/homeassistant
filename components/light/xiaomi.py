@@ -52,9 +52,8 @@ class XiaomiGatewayLight(XiaomiDevice, Light):
         if value == 0:
             if self._state:
                 self._state = False
-                return True
-            else:
-                return False
+
+            return True
 
         rgbhexstr = "%x" % value
         if len(rgbhexstr) == 7:
