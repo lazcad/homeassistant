@@ -114,7 +114,7 @@ Installation (Raspberry Pi)
 	
     trigger:
       platform: event
-      event_type: motion_action
+      event_type: motion
       event_data:
           entity_id: binary_sensor.motion_sensor_158d000xxxxxc2
   ```
