@@ -59,7 +59,7 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         XiaomiDevice.__init__(self, device, 'Motion Sensor', xiaomi_hub)
 
     @property
-    def sensor_class(self):
+    def device_class(self):
         """Return the class of binary sensor."""
         return 'motion'
 
@@ -132,7 +132,7 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
         XiaomiDevice.__init__(self, device, 'Door Window Sensor', xiaomi_hub)
 
     @property
-    def sensor_class(self):
+    def device_class(self):
         """Return the class of binary sensor."""
         return 'opening'
 
