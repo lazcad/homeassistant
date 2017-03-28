@@ -127,15 +127,7 @@ Installation (Raspberry Pi)
       entity_id: binary_sensor.door_window_sensor_158d000xxxxxc2
       from: 'no_motion'
 	  to: 'motion'
-	  
-	#trigger for door window sensor using Event
-	
-    trigger:
-      platform: event
-      event_type: door_window_action
-      event_data:
-          entity_id: binary_sensor.door_window_sensor_158d000xxxxxc2
-          action_type: open # open / close / no_close
+
   ```
 
   
