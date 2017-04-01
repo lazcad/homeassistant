@@ -390,6 +390,9 @@ class XiaomiDevice(Entity):
         self.parse_data(device['data'])
         self.xiaomi_hub = xiaomi_hub
         self._device_state_attributes = {}
+
+        self.parse_voltage(device['data'])
+
         xiaomi_hub.ha_devices[self._sid].append(self)
 
     @property
@@ -411,8 +414,7 @@ class XiaomiDevice(Entity):
         """Push from Hub"""
         _LOGGER.debug("PUSH >> %s: %s", self, data)
 
-        if 'battery' in data:
-            self._device_state_attributes[ATTR_BATTERY_LEVEL] = data['battery']
+        self.parse_voltage(data)
 
         if self.parse_data(data):
             self.schedule_update_ha_state()
@@ -420,3 +422,12 @@ class XiaomiDevice(Entity):
     def parse_data(self, data):
         """Parse data sent by gateway"""
         raise NotImplementedError()
+
+    def parse_voltage(self, data):
+        if 'voltage' in data:
+            max_volt = 3300
+            min_volt = 2800
+
+            voltage = data['voltage']
+            percent = ((max_volt - voltage) / (max_volt - min_volt)) * 100
+            self._device_state_attributes[ATTR_BATTERY_LEVEL] = round(percent)
