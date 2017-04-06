@@ -22,6 +22,8 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             if device['model'] == 'sensor_ht':
                 devices.append(XiaomiSensor(device, 'Temperature', 'temperature', gateway))
                 devices.append(XiaomiSensor(device, 'Humidity', 'humidity', gateway))
+            if device['model'] == 'natgas':
+                devices.append(XiaomiSensor(device, 'Gas', 'density', gateway))
     add_devices(devices)
 
 
@@ -42,6 +44,10 @@ class XiaomiSensor(XiaomiDevice):
     @property
     def _is_temperature(self):
         return self._data_key == 'temperature'
+
+    @property
+    def _is_gas(self):
+        return self._data_key == 'density'
 
     @property
     def available(self):
@@ -65,11 +71,16 @@ class XiaomiSensor(XiaomiDevice):
             return TEMP_CELSIUS
         elif self._data_key == 'humidity':
             return '%'
+        elif self._data_key == 'density':
+            return '%'
 
     def parse_data(self, data):
         """Parse data sent by gateway"""
         value = data.get(self._data_key)
         if value is None:
             return False
-        self.current_value = int(value) / 100
+        if self._data_key == 'density':
+            self.current_value = int(value)
+        else:
+            self.current_value = int(value) / 100
         return True
