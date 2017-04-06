@@ -27,6 +27,8 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             elif model == 'ctrl_neutral2':
                 devices.append(XiaomiGenericSwitch(device, 'Wall Switch Left', 'channel_0', gateway))
                 devices.append(XiaomiGenericSwitch(device, 'Wall Switch Right', 'channel_1', gateway))
+            elif (model == '86plug'):
+                devices.append(XiaomiGenericSwitch(device, 'Wall Plug', 'status', gateway))
     add_devices(devices)
 
 
@@ -54,15 +56,11 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
 
     def turn_on(self, **kwargs):
         """Turn the switch on."""
-        if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'on'):
-            self._state = True
-            self.schedule_update_ha_state()
+        self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'on')
 
     def turn_off(self):
         """Turn the switch off."""
-        if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'off'):
-            self._state = False
-            self.schedule_update_ha_state()
+        self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'off')
 
     def parse_data(self, data):
         """Parse data sent by gateway"""
