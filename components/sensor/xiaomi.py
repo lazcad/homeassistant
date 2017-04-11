@@ -22,7 +22,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             if device['model'] == 'sensor_ht':
                 devices.append(XiaomiSensor(device, 'Temperature', 'temperature', gateway))
                 devices.append(XiaomiSensor(device, 'Humidity', 'humidity', gateway))
-            if device['model'] == 'natgas':
+            elif device['model'] == 'natgas':
                 devices.append(XiaomiSensor(device, 'Gas', 'density', gateway))
     add_devices(devices)
 
@@ -55,6 +55,8 @@ class XiaomiSensor(XiaomiDevice):
         if self._is_temperature and self.current_value != 100:
             return True
         elif self._is_humidity and self.current_value != 0:
+            return True
+        elif self._is_gas and self.current_value != 0:
             return True
 
         return False
