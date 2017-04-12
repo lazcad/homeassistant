@@ -293,22 +293,39 @@ class XiaomiGateway:
             device_type = None
             if model in sensors:
                 device_type = 'sensor'
-            elif model in binary_sensors:
+                xiaomi_device = {
+                    "model":model,
+                    "sid":resp["sid"],
+                    "short_id":resp["short_id"],
+                    "data":data}
+                self.devices[device_type].append(xiaomi_device)
+            if model in binary_sensors:
                 device_type = 'binary_sensor'
-            elif model in switches:
+                xiaomi_device = {
+                    "model":model,
+                    "sid":resp["sid"],
+                    "short_id":resp["short_id"],
+                    "data":data}
+                self.devices[device_type].append(xiaomi_device)
+            if model in switches:
                 device_type = 'switch'
-            elif model in lights:
+                xiaomi_device = {
+                    "model":model,
+                    "sid":resp["sid"],
+                    "short_id":resp["short_id"],
+                    "data":data}
+                self.devices[device_type].append(xiaomi_device)
+            if model in lights:
                 device_type = 'light'
-            else:
+                xiaomi_device = {
+                    "model":model,
+                    "sid":resp["sid"],
+                    "short_id":resp["short_id"],
+                    "data":data}
+                self.devices[device_type].append(xiaomi_device)
+            if device_type == None:
                 _LOGGER.error('Unsupported devices : %s', model)
-                continue
 
-            xiaomi_device = {
-                "model":model,
-                "sid":resp["sid"],
-                "short_id":resp["short_id"],
-                "data":data}
-            self.devices[device_type].append(xiaomi_device)
         return True
 
     def _send_cmd(self, cmd, rtn_cmd):
