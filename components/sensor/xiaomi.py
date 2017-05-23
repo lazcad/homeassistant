@@ -22,8 +22,6 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             if device['model'] == 'sensor_ht':
                 devices.append(XiaomiSensor(device, 'Temperature', 'temperature', gateway))
                 devices.append(XiaomiSensor(device, 'Humidity', 'humidity', gateway))
-            elif device['model'] == 'natgas':
-                devices.append(XiaomiSensor(device, 'Gas', 'density', gateway))
             elif device['model'] == 'gateway':
                 devices.append(XiaomiIlluminanceSensor(device, 'Illuminance', 'illumination', gateway))
     add_devices(devices)
@@ -82,17 +80,11 @@ class XiaomiSensor(XiaomiDevice):
         return self._data_key == 'temperature'
 
     @property
-    def _is_gas(self):
-        return self._data_key == 'density'
-
-    @property
     def available(self):
         """Return True if entity is available."""
         if self._is_temperature and self.current_value != 100:
             return True
         elif self._is_humidity and self.current_value != 0:
-            return True
-        elif self._is_gas and self.current_value != 0:
             return True
 
         return False
@@ -109,16 +101,14 @@ class XiaomiSensor(XiaomiDevice):
             return TEMP_CELSIUS
         elif self._data_key == 'humidity':
             return '%'
-        elif self._data_key == 'density':
-            return '%'
 
     def parse_data(self, data):
         """Parse data sent by gateway"""
         value = data.get(self._data_key)
         if value is None:
             return False
-        if self._data_key == 'density':
-            self.current_value = int(value)
-        else:
-            self.current_value = int(value) / 100
+        value = int(value)
+        if self._data_key in ['temperature', 'humidity']:
+            value = value / 100
+        self.current_value = value
         return True
