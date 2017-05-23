@@ -43,6 +43,8 @@ POLL_MOTION = True
 # Shortcut for the logger
 _LOGGER = logging.getLogger(__name__)
 
+ATTR_RINGTONE_ID = 'ringtone_id'
+ATTR_RINGTONE_VOL = 'ringtone_vol'
 
 def setup(hass, config):
     """Set up the Xiaomi component."""
@@ -94,6 +96,54 @@ def setup(hass, config):
 
     for component in XIAOMI_COMPONENTS:
         discovery.load_platform(hass, component, DOMAIN, {}, config)
+
+
+    def play_ringtone_service(call):
+        """Service to play ringtone through Gateway."""
+        if call.data.get(ATTR_RINGTONE_ID) is None or call.data.get(ATTR_GW_SID) is None:
+           _LOGGER.error("Mandatory parameters is not specified.")
+           return
+
+        ring_id = int(call.data.get(ATTR_RINGTONE_ID))
+
+        if ring_id in [9, 14-19]:
+            _LOGGER.error('Specified mid: %s is not defined in gateway.', mid)
+            return
+
+        ring_vol = call.data.get(ATTR_RINGTONE_VOL)
+        if ring_vol is None:
+            ringtone = {'mid': ring_id}
+        else:
+            ringtone = {'mid': ring_id, 'vol': int(ring_vol)}
+
+        gw_sid = call.data.get(ATTR_GW_SID)
+
+        gateways = PY_XIAOMI_GATEWAY.gateways
+        for (ip_add, gateway) in gateways.items():
+            if gateway.sid == gw_sid:
+               gateway.write_to_hub(gateway.sid, **ringtone )
+               break
+        else:
+            _LOGGER.error('Unknown gateway sid: %s was specified.', gw_sid)
+
+    def stop_ringtone_service(call):
+        """Service to stop playing ringtone on Gateway."""
+        gw_sid = call.data.get(ATTR_GW_SID)
+        if gw_sid is None:
+           _LOGGER.error("Mandatory parameters is not specified.")
+           return
+
+        gateways = PY_XIAOMI_GATEWAY.gateways
+        for (ip_add, gateway) in gateways.items():
+            if gateway.sid == gw_sid:
+               ringtone = {'mid': 10000}
+               gateway.write_to_hub(gateway.sid, **ringtone )
+               break
+        else:
+            _LOGGER.error('Unknown gateway sid: %s was specified.', gw_sid)
+
+    hass.services.async_register(DOMAIN, 'play_ringtone', play_ringtone_service, description=None, schema=None)
+    hass.services.async_register(DOMAIN, 'stop_ringtone', stop_ringtone_service, description=None, schema=None)
 
     return True
 
