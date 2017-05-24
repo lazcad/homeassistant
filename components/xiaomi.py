@@ -45,6 +45,7 @@ _LOGGER = logging.getLogger(__name__)
 
 ATTR_RINGTONE_ID = 'ringtone_id'
 ATTR_RINGTONE_VOL = 'ringtone_vol'
+ATTR_GW_SID = 'gw_sid'
 
 def setup(hass, config):
     """Set up the Xiaomi component."""
@@ -100,9 +101,12 @@ def setup(hass, config):
 
     def play_ringtone_service(call):
         """Service to play ringtone through Gateway."""
-        if call.data.get(ATTR_RINGTONE_ID) is None or call.data.get(ATTR_GW_SID) is None:
-           _LOGGER.error("Mandatory parameters is not specified.")
-           return
+        if call.data.get(ATTR_RINGTONE_ID) is None:
+            _LOGGER.error("Mandatory parameters is not specified.")
+            return
+        if (len(PY_XIAOMI_GATEWAY.gateways) != 1) and call.data.get(ATTR_GW_SID) is None:
+            _LOGGER.error("Mandatory parameters is not specified.")
+            return
 
         ring_id = int(call.data.get(ATTR_RINGTONE_ID))
 
@@ -120,25 +124,31 @@ def setup(hass, config):
 
         gateways = PY_XIAOMI_GATEWAY.gateways
         for (ip_add, gateway) in gateways.items():
-            if gateway.sid == gw_sid:
-               gateway.write_to_hub(gateway.sid, **ringtone )
-               break
+            if (len(gateways) == 1):
+                gateway.write_to_hub_multi(gateway.sid, **ringtone )
+                break
+            elif gateway.sid == gw_sid:
+                gateway.write_to_hub_multi(gateway.sid, **ringtone )
+                break
         else:
             _LOGGER.error('Unknown gateway sid: %s was specified.', gw_sid)
 
     def stop_ringtone_service(call):
         """Service to stop playing ringtone on Gateway."""
+        if (len(PY_XIAOMI_GATEWAY.gateways) != 1) and call.data.get(ATTR_GW_SID) is None:
+            _LOGGER.error("Mandatory parameters is not specified.")
+            return
+
         gw_sid = call.data.get(ATTR_GW_SID)
-        if gw_sid is None:
-           _LOGGER.error("Mandatory parameters is not specified.")
-           return
 
         gateways = PY_XIAOMI_GATEWAY.gateways
         for (ip_add, gateway) in gateways.items():
-            if gateway.sid == gw_sid:
-               ringtone = {'mid': 10000}
-               gateway.write_to_hub(gateway.sid, **ringtone )
-               break
+            if (len(gateways) == 1):
+                gateway.write_to_hub(gateway.sid, 'mid', 10000)
+                break
+            elif gateway.sid == gw_sid:
+                gateway.write_to_hub(gateway.sid, 'mid', 10000)
+                break
         else:
             _LOGGER.error('Unknown gateway sid: %s was specified.', gw_sid)
 
@@ -404,6 +414,22 @@ class XiaomiGateway:
         if self._key is None:
             return False
         data['key'] = self._key
+        cmd = {}
+        cmd['cmd'] = 'write'
+        cmd['sid'] = sid
+        cmd['data'] = data
+        cmd = json.dumps(cmd)
+        resp = self._send_cmd(cmd, "write_ack")
+        return self._validate_data(resp)
+
+    def write_to_hub_multi(self, sid, **kwargs):
+        """Send data to gateway to turn on / off device"""
+        data = {}
+        for key in kwargs:
+            data[key] = kwargs[key]
+        if self.token is None:
+            return False
+        data['key'] = self._get_key()
         cmd = {}
         cmd['cmd'] = 'write'
         cmd['sid'] = sid
