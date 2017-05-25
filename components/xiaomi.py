@@ -427,9 +427,9 @@ class XiaomiGateway:
         data = {}
         for key in kwargs:
             data[key] = kwargs[key]
-        if self.token is None:
+        if self._key is None:
             return False
-        data['key'] = self._get_key()
+        data['key'] = self._key
         cmd = {}
         cmd['cmd'] = 'write'
         cmd['sid'] = sid
