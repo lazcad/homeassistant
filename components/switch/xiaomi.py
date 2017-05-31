@@ -13,6 +13,13 @@ except ImportError:
 
 _LOGGER = logging.getLogger(__name__)
 
+ATTR_LOAD_POWER = 'Load power' # Load power in watts (W)
+ATTR_POWER_CONSUMED = 'Power consumed' #Load power consumption in kilowatt hours (kWh)
+ATTR_IN_USE = 'In use'
+LOAD_POWER = 'load_power'
+POWER_CONSUMED = 'power_consumed'
+IN_USE = 'inuse'
+
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Perform the setup for Xiaomi devices."""
     devices = []
@@ -27,6 +34,8 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             elif model == 'ctrl_neutral2':
                 devices.append(XiaomiGenericSwitch(device, 'Wall Switch Left', 'channel_0', gateway))
                 devices.append(XiaomiGenericSwitch(device, 'Wall Switch Right', 'channel_1', gateway))
+            elif (model == '86plug'):
+                devices.append(XiaomiGenericSwitch(device, 'Wall Plug', 'status', gateway))
     add_devices(devices)
 
 
@@ -37,6 +46,9 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
         """Initialize the XiaomiPlug."""
         self._state = False
         self._data_key = data_key
+        self._in_use = False
+        self._load_power = 0
+        self._power_consumed = 0
         XiaomiDevice.__init__(self, device, name, xiaomi_hub)
 
     @property
@@ -52,20 +64,35 @@ class XiaomiGenericSwitch(XiaomiDevice, SwitchDevice):
         """Return true if plug is on."""
         return self._state
 
+    @property
+    def device_state_attributes(self):
+        """Return the state attributes."""
+        attrs = {ATTR_IN_USE: self._in_use,
+                 ATTR_LOAD_POWER: self._load_power,
+                 ATTR_POWER_CONSUMED: self._power_consumed}
+        attrs.update(super().device_state_attributes)
+        return attrs
     def turn_on(self, **kwargs):
         """Turn the switch on."""
-        if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'on'):
-            self._state = True
-            self.schedule_update_ha_state()
+        self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'on')
 
     def turn_off(self):
         """Turn the switch off."""
-        if self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'off'):
-            self._state = False
-            self.schedule_update_ha_state()
+        self.xiaomi_hub.write_to_hub(self._sid, self._data_key, 'off')
 
     def parse_data(self, data):
-        """Parse data sent by gateway"""
+        """Parse data sent by gateway"""
+        if IN_USE in data:
+            self._in_use = int(data[IN_USE])
+            if not self._in_use:
+                self._load_power = 0
+
+        if POWER_CONSUMED in data:
+            self._power_consumed = int(data[POWER_CONSUMED])
+
+        if LOAD_POWER in data:
+            self._load_power = int(data[LOAD_POWER])
+
         value = data.get(self._data_key)
         if value is None:
             return False

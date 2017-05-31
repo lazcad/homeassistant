@@ -43,6 +43,9 @@ POLL_MOTION = True
 # Shortcut for the logger
 _LOGGER = logging.getLogger(__name__)
 
+ATTR_RINGTONE_ID = 'ringtone_id'
+ATTR_RINGTONE_VOL = 'ringtone_vol'
+ATTR_GW_SID = 'gw_sid'
 
 def setup(hass, config):
     """Set up the Xiaomi component."""
@@ -94,6 +97,63 @@ def setup(hass, config):
 
     for component in XIAOMI_COMPONENTS:
         discovery.load_platform(hass, component, DOMAIN, {}, config)
+
+
+    def play_ringtone_service(call):
+        """Service to play ringtone through Gateway."""
+        if call.data.get(ATTR_RINGTONE_ID) is None:
+            _LOGGER.error("Mandatory parameters is not specified.")
+            return
+        if (len(PY_XIAOMI_GATEWAY.gateways) != 1) and call.data.get(ATTR_GW_SID) is None:
+            _LOGGER.error("Mandatory parameters is not specified.")
+            return
+
+        ring_id = int(call.data.get(ATTR_RINGTONE_ID))
+
+        if ring_id in [9, 14-19]:
+            _LOGGER.error('Specified mid: %s is not defined in gateway.', mid)
+            return
+
+        ring_vol = call.data.get(ATTR_RINGTONE_VOL)
+        if ring_vol is None:
+            ringtone = {'mid': ring_id}
+        else:
+            ringtone = {'mid': ring_id, 'vol': int(ring_vol)}
+
+        gw_sid = call.data.get(ATTR_GW_SID)
+
+        gateways = PY_XIAOMI_GATEWAY.gateways
+        for (ip_add, gateway) in gateways.items():
+            if (len(gateways) == 1):
+                gateway.write_to_hub_multi(gateway.sid, **ringtone )
+                break
+            elif gateway.sid == gw_sid:
+                gateway.write_to_hub_multi(gateway.sid, **ringtone )
+                break
+        else:
+            _LOGGER.error('Unknown gateway sid: %s was specified.', gw_sid)
+
+    def stop_ringtone_service(call):
+        """Service to stop playing ringtone on Gateway."""
+        if (len(PY_XIAOMI_GATEWAY.gateways) != 1) and call.data.get(ATTR_GW_SID) is None:
+            _LOGGER.error("Mandatory parameters is not specified.")
+            return
+
+        gw_sid = call.data.get(ATTR_GW_SID)
+
+        gateways = PY_XIAOMI_GATEWAY.gateways
+        for (ip_add, gateway) in gateways.items():
+            if (len(gateways) == 1):
+                gateway.write_to_hub(gateway.sid, 'mid', 10000)
+                break
+            elif gateway.sid == gw_sid:
+                gateway.write_to_hub(gateway.sid, 'mid', 10000)
+                break
+        else:
+            _LOGGER.error('Unknown gateway sid: %s was specified.', gw_sid)
+
+    hass.services.async_register(DOMAIN, 'play_ringtone', play_ringtone_service, description=None, schema=None)
+    hass.services.async_register(DOMAIN, 'stop_ringtone', stop_ringtone_service, description=None, schema=None)
 
     return True
 
@@ -274,9 +334,9 @@ class XiaomiGateway:
 
         _LOGGER.info('Found %s devices', len(sids))
 
-        sensors = ['sensor_ht']
-        binary_sensors = ['magnet', 'motion', 'switch', '86sw1', '86sw2', 'cube', 'smoke']
-        switches = ['plug', 'ctrl_neutral1', 'ctrl_neutral2']
+        sensors = ['sensor_ht', 'gateway']
+        binary_sensors = ['magnet', 'motion', 'switch', '86sw1', '86sw2', 'cube', 'smoke', 'natgas']
+        switches = ['plug', 'ctrl_neutral1', 'ctrl_neutral2', '86plug']
         lights = ['gateway']
 
         for sid in sids:
@@ -293,22 +353,39 @@ class XiaomiGateway:
             device_type = None
             if model in sensors:
                 device_type = 'sensor'
-            elif model in binary_sensors:
+                xiaomi_device = {
+                    "model":model,
+                    "sid":resp["sid"],
+                    "short_id":resp["short_id"],
+                    "data":data}
+                self.devices[device_type].append(xiaomi_device)
+            if model in binary_sensors:
                 device_type = 'binary_sensor'
-            elif model in switches:
+                xiaomi_device = {
+                    "model":model,
+                    "sid":resp["sid"],
+                    "short_id":resp["short_id"],
+                    "data":data}
+                self.devices[device_type].append(xiaomi_device)
+            if model in switches:
                 device_type = 'switch'
-            elif model in lights:
+                xiaomi_device = {
+                    "model":model,
+                    "sid":resp["sid"],
+                    "short_id":resp["short_id"],
+                    "data":data}
+                self.devices[device_type].append(xiaomi_device)
+            if model in lights:
                 device_type = 'light'
-            else:
+                xiaomi_device = {
+                    "model":model,
+                    "sid":resp["sid"],
+                    "short_id":resp["short_id"],
+                    "data":data}
+                self.devices[device_type].append(xiaomi_device)
+            if device_type == None:
                 _LOGGER.error('Unsupported devices : %s', model)
-                continue
 
-            xiaomi_device = {
-                "model":model,
-                "sid":resp["sid"],
-                "short_id":resp["short_id"],
-                "data":data}
-            self.devices[device_type].append(xiaomi_device)
         return True
 
     def _send_cmd(self, cmd, rtn_cmd):
@@ -334,6 +411,22 @@ class XiaomiGateway:
         """Send data to gateway to turn on / off device"""
         data = {}
         data[data_key] = datavalue
+        if self._key is None:
+            return False
+        data['key'] = self._key
+        cmd = {}
+        cmd['cmd'] = 'write'
+        cmd['sid'] = sid
+        cmd['data'] = data
+        cmd = json.dumps(cmd)
+        resp = self._send_cmd(cmd, "write_ack")
+        return self._validate_data(resp)
+
+    def write_to_hub_multi(self, sid, **kwargs):
+        """Send data to gateway to turn on / off device"""
+        data = {}
+        for key in kwargs:
+            data[key] = kwargs[key]
         if self._key is None:
             return False
         data['key'] = self._key
@@ -429,5 +522,9 @@ class XiaomiDevice(Entity):
             min_volt = 2800
 
             voltage = data['voltage']
-            percent = ((max_volt - voltage) / (max_volt - min_volt)) * 100
+            if voltage > max_volt:
+                voltage = max_volt
+            elif voltage < min_volt:
+                voltage = min_volt
+            percent = ((voltage - min_volt) / (max_volt - min_volt)) * 100
             self._device_state_attributes[ATTR_BATTERY_LEVEL] = round(percent)
