@@ -20,74 +20,44 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     for (ip_add, gateway) in gateways.items():
         for device in gateway.devices['sensor']:
             if device['model'] == 'sensor_ht':
-                devices.append(XiaomiSensor(device, 'Temperature', 'temperature', gateway))
-                devices.append(XiaomiSensor(device, 'Humidity', 'humidity', gateway))
+                temp_info = SensorInfo('Temperature', 'temperature', TEMP_CELSIUS, 100, 0, 0.01)
+                humi_info = SensorInfo('Humidity', 'humidity', '%', 100, 0, 0.01)
+                devices.append(XiaomiSensor(device, temp_info, gateway))
+                devices.append(XiaomiSensor(device, humi_info, gateway))
             elif device['model'] == 'gateway':
-                devices.append(XiaomiIlluminanceSensor(device, 'Illuminance', 'illumination', gateway))
+                illu_info = SensorInfo('Illuminance', 'illumination', 'lx', 100000, 0, 1)
+                devices.append(XiaomiSensor(device, illu_info, gateway))
     add_devices(devices)
 
-class XiaomiIlluminanceSensor(XiaomiDevice):
-    """Xiaomi Illuminance Sensor"""
-    def __init__(self, device, name, data_key, xiaomi_hub):
-        """Initialize the XiaomiSensor."""
-        self.current_value = None
-        self._data_key = data_key
-        XiaomiDevice.__init__(self, device, name, xiaomi_hub)
-
-    @property
-    def available(self):
-        """Return True if entity is available."""
-        if self.current_value != 0:
-            return True
-
-        return False
-
-    @property
-    def state(self):
-        """Return the name of the sensor."""
-        return self.current_value
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit of measurement of this entity, if any."""
-        return 'lx'
-
-    def parse_data(self, data):
-        """Parse data sent by gateway"""
-        value = data.get(self._data_key)
-        if value is None:
-            return False
-
-        self.current_value = int(value)
-        return True
+class SensorInfo(object):
+    """Xiaomi Sensor info"""
+    def __init__(self, name, data_key, units, max_value, min_value, value_modifier):
+        self.name = name
+        self.data_key = data_key
+        self.units = units
+        self.max = max_value
+        self.min = min_value
+        self.value_modifier = value_modifier
 
 class XiaomiSensor(XiaomiDevice):
     """Representation of a XiaomiSensor."""
 
-    def __init__(self, device, name, data_key, xiaomi_hub):
+    def __init__(self, device, sensor_info, xiaomi_hub):
         """Initialize the XiaomiSensor."""
         self.current_value = None
-        self._data_key = data_key
+        self._data_key = sensor_info.data_key
         self._battery = None
-        XiaomiDevice.__init__(self, device, name, xiaomi_hub)
+        self._units = sensor_info.units
+        self._max = sensor_info.max
+        self._min = sensor_info.min
+        self._value_modifier = sensor_info.value_modifier
 
-    @property
-    def _is_humidity(self):
-        return self._data_key == 'humidity'
-
-    @property
-    def _is_temperature(self):
-        return self._data_key == 'temperature'
+        XiaomiDevice.__init__(self, device, sensor_info.name, xiaomi_hub)
 
     @property
     def available(self):
         """Return True if entity is available."""
-        if self._is_temperature and self.current_value != 100:
-            return True
-        elif self._is_humidity and self.current_value != 0:
-            return True
-
-        return False
+        return self.current_value > self._min and self.current_value < self._max
 
     @property
     def state(self):
@@ -97,18 +67,13 @@ class XiaomiSensor(XiaomiDevice):
     @property
     def unit_of_measurement(self):
         """Return the unit of measurement of this entity, if any."""
-        if self._data_key == 'temperature':
-            return TEMP_CELSIUS
-        elif self._data_key == 'humidity':
-            return '%'
+        return self._units
 
     def parse_data(self, data):
         """Parse data sent by gateway"""
         value = data.get(self._data_key)
         if value is None:
             return False
-        value = int(value)
-        if self._data_key in ['temperature', 'humidity']:
-            value = value / 100
-        self.current_value = value
+
+        self.current_value = int(value) * self._value_modifier
         return True

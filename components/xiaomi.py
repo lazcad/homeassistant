@@ -3,6 +3,7 @@ Support for Xiaomi Gateways.
 
 Developed by Rave from Lazcad.com
 """
+
 import socket
 import json
 import logging
@@ -15,7 +16,6 @@ from collections import defaultdict
 from homeassistant.helpers import discovery
 from homeassistant.helpers.entity import Entity
 from homeassistant.const import ATTR_BATTERY_LEVEL, EVENT_HOMEASSISTANT_STOP
-
 
 REQUIREMENTS = ['pyCrypto==2.6.1']
 
@@ -31,14 +31,13 @@ CONFIG_SCHEMA = vol.Schema({
     DOMAIN: vol.Schema({
         vol.Optional(CONF_GATEWAYS, default=[{"sid": None, "key": DEFAULT_KEY}]): cv.ensure_list,
         vol.Optional(CONF_INTERFACE, default='any'): cv.string,
-        vol.Optional(CONF_POLL_MOTION, default=True): cv.boolean,
+        vol.Optional(CONF_POLL_MOTION, default=False): cv.boolean,
         vol.Optional(CONF_DISCOVERY_RETRY, default=3): cv.positive_int
     })
 }, extra=vol.ALLOW_EXTRA)
 
 XIAOMI_COMPONENTS = ['binary_sensor', 'sensor', 'switch', 'light']
 PY_XIAOMI_GATEWAY = None
-POLL_MOTION = True
 
 # Shortcut for the logger
 _LOGGER = logging.getLogger(__name__)
@@ -50,12 +49,12 @@ ATTR_GW_SID = 'gw_sid'
 def setup(hass, config):
     """Set up the Xiaomi component."""
 
+    hass.data[DOMAIN] = {}
+    hass.data[DOMAIN]['poll_motion'] = config[DOMAIN][CONF_POLL_MOTION]
+
     gateways = config[DOMAIN][CONF_GATEWAYS]
     interface = config[DOMAIN][CONF_INTERFACE]
     discovery_retry = config[DOMAIN][CONF_DISCOVERY_RETRY]
-
-    global POLL_MOTION
-    POLL_MOTION = config[DOMAIN][CONF_POLL_MOTION]
 
     for gateway in gateways:
         sid = gateway['sid']
@@ -65,7 +64,7 @@ def setup(hass, config):
 
         key = gateway['key']
         if key == DEFAULT_KEY:
-            _LOGGER.warning('Gateway Key is not provided. Controlling gateway device will not be possible.')
+            _LOGGER.warning('Gateway Key is not provided. Only sensors will be loaded.')
 
         if len(key) != 16:
             _LOGGER.error('Invalid key %s. Key must be 16 characters', key)
@@ -124,11 +123,11 @@ def setup(hass, config):
 
         gateways = PY_XIAOMI_GATEWAY.gateways
         for (ip_add, gateway) in gateways.items():
-            if (len(gateways) == 1):
-                gateway.write_to_hub_multi(gateway.sid, **ringtone )
+            if len(gateways) == 1:
+                gateway.write_to_hub_multi(gateway.sid, **ringtone)
                 break
             elif gateway.sid == gw_sid:
-                gateway.write_to_hub_multi(gateway.sid, **ringtone )
+                gateway.write_to_hub_multi(gateway.sid, **ringtone)
                 break
         else:
             _LOGGER.error('Unknown gateway sid: %s was specified.', gw_sid)
@@ -143,7 +142,7 @@ def setup(hass, config):
 
         gateways = PY_XIAOMI_GATEWAY.gateways
         for (ip_add, gateway) in gateways.items():
-            if (len(gateways) == 1):
+            if len(gateways) == 1:
                 gateway.write_to_hub(gateway.sid, 'mid', 10000)
                 break
             elif gateway.sid == gw_sid:
@@ -221,6 +220,10 @@ class PyXiaomiGateway:
 
                 sid = resp["sid"]
                 port = resp["port"]
+
+                #Info to fill in API key in Configuration.xml
+                if gateway_key == DEFAULT_KEY:
+                    _LOGGER.warning('To enable discovery of switches, fill in API key in configuration.xml sid = %s', sid)
 
                 _LOGGER.info('Xiaomi Gateway %s found at IP %s', sid, ip_add)
 
@@ -351,39 +354,35 @@ class XiaomiGateway:
 
             model = resp["model"]
             device_type = None
+
+            xiaomi_device = {
+                "model":model,
+                "sid":resp["sid"],
+                "short_id":resp["short_id"],
+                "data":data
+            }
+
             if model in sensors:
                 device_type = 'sensor'
-                xiaomi_device = {
-                    "model":model,
-                    "sid":resp["sid"],
-                    "short_id":resp["short_id"],
-                    "data":data}
                 self.devices[device_type].append(xiaomi_device)
+
             if model in binary_sensors:
                 device_type = 'binary_sensor'
-                xiaomi_device = {
-                    "model":model,
-                    "sid":resp["sid"],
-                    "short_id":resp["short_id"],
-                    "data":data}
                 self.devices[device_type].append(xiaomi_device)
+
             if model in switches:
                 device_type = 'switch'
-                xiaomi_device = {
-                    "model":model,
-                    "sid":resp["sid"],
-                    "short_id":resp["short_id"],
-                    "data":data}
-                self.devices[device_type].append(xiaomi_device)
+                #Ignore switches without API key
+                if self.key != DEFAULT_KEY:
+                    self.devices[device_type].append(xiaomi_device)
+
             if model in lights:
                 device_type = 'light'
-                xiaomi_device = {
-                    "model":model,
-                    "sid":resp["sid"],
-                    "short_id":resp["short_id"],
-                    "data":data}
-                self.devices[device_type].append(xiaomi_device)
-            if device_type == None:
+                #Ignore switches without API key
+                if self.key != DEFAULT_KEY:
+                    self.devices[device_type].append(xiaomi_device)
+
+            if device_type is None:
                 _LOGGER.error('Unsupported devices : %s', model)
 
         return True
@@ -480,11 +479,11 @@ class XiaomiDevice(Entity):
         """Initialize the xiaomi device."""
         self._sid = device['sid']
         self._name = '{}_{}'.format(name, self._sid)
-        self.parse_data(device['data'])
-        self.xiaomi_hub = xiaomi_hub
         self._device_state_attributes = {}
+        self.xiaomi_hub = xiaomi_hub
 
-        self.parse_voltage(device['data'])
+        self.parse_data(device['data'])
+        self._parse_voltage(device['data'])
 
         xiaomi_hub.ha_devices[self._sid].append(self)
 
@@ -507,7 +506,7 @@ class XiaomiDevice(Entity):
         """Push from Hub"""
         _LOGGER.debug("PUSH >> %s: %s", self, data)
 
-        self.parse_voltage(data)
+        self._parse_voltage(data)
 
         if self.parse_data(data):
             self.schedule_update_ha_state()
@@ -516,7 +515,7 @@ class XiaomiDevice(Entity):
         """Parse data sent by gateway"""
         raise NotImplementedError()
 
-    def parse_voltage(self, data):
+    def _parse_voltage(self, data):
         if 'voltage' in data:
             max_volt = 3300
             min_volt = 2800

@@ -8,9 +8,9 @@ import asyncio
 
 from homeassistant.components.binary_sensor import BinarySensorDevice
 try:
-    from homeassistant.components.xiaomi import (PY_XIAOMI_GATEWAY, XiaomiDevice, POLL_MOTION)
+    from homeassistant.components.xiaomi import (PY_XIAOMI_GATEWAY, XiaomiDevice, DOMAIN)
 except ImportError:
-    from custom_components.xiaomi import (PY_XIAOMI_GATEWAY, XiaomiDevice, POLL_MOTION)
+    from custom_components.xiaomi import (PY_XIAOMI_GATEWAY, XiaomiDevice, DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,9 +38,9 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
             elif model == 'magnet':
                 devices.append(XiaomiDoorSensor(device, gateway))
             elif model == 'smoke':
-                devices.append(XiaomiSmokeSensor(device, gateway))
+                devices.append(XiaomiSmokeGasSensor(device, gateway, 'Smoke Sensor', 'smoke'))
             elif model == 'natgas':
-                devices.append(XiaomiNatgasSensor(device, gateway))
+                devices.append(XiaomiSmokeGasSensor(device, gateway, 'Natural Gas Sensor', 'gas'))
             elif model == 'switch':
                 devices.append(XiaomiButton(device, 'Switch', 'status', hass, gateway))
             elif model == '86sw1':
@@ -63,6 +63,7 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
         self._data_key = 'status'
         self._no_motion_since = 0
         self._is_firing_motion = False
+        self._poll_motion = hass.data[DOMAIN]['poll_motion']
         XiaomiDevice.__init__(self, device, 'Motion Sensor', xiaomi_hub)
 
     @property
@@ -103,7 +104,7 @@ class XiaomiMotionSensor(XiaomiDevice, BinarySensorDevice):
                 return False
             else:
                 self._state = True
-                if POLL_MOTION:
+                if self._poll_motion:
                     self._hass.loop.create_task(self._async_poll_status())
                 return True
         elif value == NO_MOTION:
@@ -179,20 +180,21 @@ class XiaomiDoorSensor(XiaomiDevice, BinarySensorDevice):
             else:
                 return False
 
-class XiaomiNatgasSensor(XiaomiDevice, BinarySensorDevice):
-    """Representation of a XiaomiNatgasSensor."""
+class XiaomiSmokeGasSensor(XiaomiDevice, BinarySensorDevice):
+    """Representation of a Xiaomi Smoke or Gas Sensor."""
 
-    def __init__(self, device, xiaomi_hub):
+    def __init__(self, device, xiaomi_hub, device_name, device_class):
         """Initialize the XiaomiNatgasSensor."""
         self._state = False
         self._data_key = 'alarm'
+        self._device_class = device_class
         self._density = 0
-        XiaomiDevice.__init__(self, device, 'Natgas Sensor', xiaomi_hub)
+        XiaomiDevice.__init__(self, device, device_name, xiaomi_hub)
 
     @property
     def device_class(self):
         """Return the class of binary sensor."""
-        return 'gas'
+        return self._device_class
 
     @property
     def is_on(self):
@@ -210,57 +212,7 @@ class XiaomiNatgasSensor(XiaomiDevice, BinarySensorDevice):
         """Parse data sent by gateway"""
 
         if DENSITY in data:
-           self._density = int(data.get(DENSITY))
-
-        value = data.get(self._data_key)
-        if value is None:
-            return False
-
-        if value == '1':
-            if self._state:
-                return False
-            else:
-                self._state = True
-                return True
-        elif value == '0':
-            if self._state:
-                self._state = False
-                return True
-            else:
-                return False
-
-class XiaomiSmokeSensor(XiaomiDevice, BinarySensorDevice):
-    """Representation of a XiaomiSmokeSensor."""
-
-    def __init__(self, device, xiaomi_hub):
-        """Initialize the XiaomiSmokeSensor."""
-        self._state = False
-        self._data_key = 'alarm'
-        self._density = 0
-        XiaomiDevice.__init__(self, device, 'Smoke Sensor', xiaomi_hub)
-
-    @property
-    def device_class(self):
-        """Return the class of binary sensor."""
-        return 'smoke'
-
-    @property
-    def is_on(self):
-        """Return true if sensor is on."""
-        return self._state
-
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes."""
-        attrs = {ATTR_DENSITY: self._density}
-        attrs.update(super().device_state_attributes)
-        return attrs
-
-    def parse_data(self, data):
-        """Parse data sent by gateway"""
-
-        if DENSITY in data:
-           self._density = int(data.get(DENSITY))
+            self._density = int(data.get(DENSITY))
 
         value = data.get(self._data_key)
         if value is None:
